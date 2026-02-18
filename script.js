@@ -1009,6 +1009,17 @@ function addToCart(productName, price) {
   sendPushNotification('Produit ajouté', `${productName} a été ajouté à votre panier.`);
 }
 
+function changeCartQuantity(index, delta) {
+  const item = cart[index];
+  if (!item) return;
+  item.quantity += delta;
+  if (item.quantity <= 0) {
+    cart.splice(index, 1);
+  }
+  localStorage.setItem('cart', JSON.stringify(cart));
+  updateCartDisplay();
+}
+
 function removeFromCart(index) {
   cart.splice(index, 1);
   localStorage.setItem('cart', JSON.stringify(cart));
@@ -1027,9 +1038,15 @@ function updateCartDisplay() {
       <div class="cart-item">
         <div class="cart-item-info">
           <h4>${item.name}</h4>
-          <span>${item.quantity} x ${item.price.toLocaleString()} FCFA</span>
+          <span>${item.price.toLocaleString()} FCFA / unite</span>
+          <div class="cart-line-total">Sous-total: ${(item.price * item.quantity).toLocaleString()} FCFA</div>
+          <div class="cart-qty-controls">
+            <button class="qty-btn" onclick="changeCartQuantity(${index}, -1)" aria-label="Diminuer quantite">−</button>
+            <span class="qty-value">${item.quantity}</span>
+            <button class="qty-btn" onclick="changeCartQuantity(${index}, 1)" aria-label="Augmenter quantite">+</button>
+          </div>
         </div>
-        <button onclick="removeFromCart(${index})">×</button>
+        <button class="cart-remove-btn" onclick="removeFromCart(${index})" aria-label="Supprimer article">Supprimer</button>
       </div>
     `).join('');
   }
@@ -1116,6 +1133,32 @@ function updateProductButtonLabels() {
       button.textContent = 'Ajouter au panier';
     } else if (clickAction.includes('payWithWave(')) {
       button.textContent = 'Ajouter (Wave)';
+    }
+  });
+}
+
+function normalizeProductCopy() {
+  const canonical = {
+    'Capcut Pro': { title: 'CapCut Pro', desc: 'Editez vos videos comme un pro' },
+    'Figma': { title: 'Figma Pro', desc: 'Design collaboratif professionnel' },
+    'YouTube Premium': { title: 'YouTube Premium', desc: 'Sans pub • Lecture en arriere-plan' },
+    'Amazon Prime Video': { title: 'Amazon Prime Video', desc: 'Films et series Prime Originals' },
+    'ChatGPT Plus': { title: 'ChatGPT Plus', desc: 'IA rapide pour etudes, travail et business' },
+    'Microsoft 365': { title: 'Microsoft 365', desc: 'Word, Excel, PowerPoint et 1 TB OneDrive' },
+    'Crunchyroll Premium': { title: 'Crunchyroll Premium', desc: 'Animes HD sans pub' },
+    'Deezer Premium': { title: 'Deezer Premium', desc: 'Musique illimitee sans pub' },
+    'Spotify Premium': { title: 'Spotify Premium', desc: 'Sans pub • Mode hors connexion' }
+  };
+
+  document.querySelectorAll('.product-card').forEach(card => {
+    const titleEl = card.querySelector('h3');
+    const descEl = card.querySelector('p');
+    if (!titleEl || !descEl) return;
+    const current = titleEl.textContent.trim();
+    const normalized = canonical[current];
+    if (normalized) {
+      titleEl.textContent = normalized.title;
+      descEl.textContent = normalized.desc;
     }
   });
 }
@@ -1424,6 +1467,7 @@ function animateCounters() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  normalizeProductCopy();
   normalizeProductPrices();
   injectProductDetails();
   animateCounters();

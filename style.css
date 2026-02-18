@@ -1740,6 +1740,47 @@ button:active,
     color: #6f3cff;
 }
 
+.cart-line-total {
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #164f7a;
+}
+
+.cart-qty-controls {
+    margin-top: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.qty-btn {
+    width: 26px;
+    height: 26px;
+    border: 1px solid #d6deea;
+    border-radius: 8px;
+    background: #f7fbff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.qty-value {
+    min-width: 20px;
+    text-align: center;
+    font-weight: 700;
+    color: #203a5f;
+}
+
+.cart-remove-btn {
+    border: 1px solid #f3b3b3;
+    background: #fff5f5;
+    color: #b12020;
+    border-radius: 8px;
+    padding: 0.35rem 0.55rem;
+    font-size: 12px;
+    cursor: pointer;
+}
+
 .cart-total {
     padding: 20px;
     border-top: 1px solid #eee;
@@ -2512,6 +2553,21 @@ body::after {
 .footer {
     background: linear-gradient(120deg, #11203b, #23344f);
     color: rgba(255, 255, 255, 0.86);
+}
+
+.footer-links {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.footer-links a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-size: 0.9rem;
 }
 
 @media (max-width: 768px) {

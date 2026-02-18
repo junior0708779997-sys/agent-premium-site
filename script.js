@@ -139,6 +139,25 @@ let quickCheckoutState = {
 };
 let preferredCheckoutPayment = "Wave";
 
+function getActiveUser() {
+  if (window.AgentAuth && typeof window.AgentAuth.getCurrentUser === 'function') {
+    return window.AgentAuth.getCurrentUser();
+  }
+  return currentUser || null;
+}
+
+function recordOrderForActiveUser(paymentMethod, amount, items) {
+  if (!window.AgentAuth || typeof window.AgentAuth.recordOrder !== 'function') return;
+  const user = window.AgentAuth.getCurrentUser();
+  if (!user) return;
+  window.AgentAuth.recordOrder({
+    totalAmount: amount,
+    paymentMethod: paymentMethod,
+    items: items,
+    status: 'confirmee'
+  });
+}
+
 function parseProductInfo(product, fallbackAmount = 0) {
   const cleaned = String(product || "").trim();
   const amountFromText = parseInt(cleaned.replace(/\D/g, ""), 10) || fallbackAmount || 0;
@@ -258,11 +277,12 @@ function saveQuickCustomer() {
 
 function confirmQuickCheckout() {
   const phone = "2250708779997";
-  const itemsText = quickCheckoutState.mode === "cart" && quickCheckoutState.items.length > 0
-    ? quickCheckoutState.items.map(item =>
-        `- ${item.name} x${item.quantity} = ${(item.unitPrice * item.quantity).toLocaleString()} FCFA`
-      ).join("\n")
-    : `- Produit: ${quickCheckoutState.productName}`;
+  const orderItems = quickCheckoutState.mode === "cart" && quickCheckoutState.items.length > 0
+    ? quickCheckoutState.items
+    : [{ name: quickCheckoutState.productName, quantity: 1, unitPrice: quickCheckoutState.amount }];
+  const itemsText = orderItems.map(item =>
+    `- ${item.name} x${item.quantity} = ${(item.unitPrice * item.quantity).toLocaleString()} FCFA`
+  ).join("\n");
   const message = `
 Bonjour AGENT PREMIUM,
 
@@ -276,6 +296,7 @@ ${itemsText}
 Merci de m'envoyer la procedure finale.
 `;
   window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+  recordOrderForActiveUser(quickCheckoutState.payment, quickCheckoutState.amount, orderItems);
   if (quickCheckoutState.mode === "cart") {
     cart = [];
     localStorage.setItem('cart', JSON.stringify(cart));
@@ -1214,6 +1235,9 @@ function handleAuth(event) {
 }
 
 function logout() {
+  if (window.AgentAuth && typeof window.AgentAuth.logout === 'function') {
+    window.AgentAuth.logout();
+  }
   currentUser = null;
   localStorage.removeItem('currentUser');
   updateUserDisplay();
@@ -1222,11 +1246,78 @@ function logout() {
 function updateUserDisplay() {
   const dashboardToggle = document.getElementById('dashboard-toggle');
   if (!dashboardToggle) return;
-  if (currentUser) {
-    dashboardToggle.textContent = currentUser.name;
+  const activeUser = getActiveUser();
+  if (activeUser) {
+    const firstName = String(activeUser.name || activeUser.email || '👤').split(' ')[0];
+    dashboardToggle.textContent = firstName;
   } else {
     dashboardToggle.textContent = '👤';
   }
+}
+
+function renderAccountOrders() {
+  const ordersContainer = document.getElementById('account-orders');
+  const userLine = document.getElementById('account-user-line');
+  const loginLink = document.querySelector('.account-login-link');
+  const logoutBtn = document.getElementById('account-logout-btn');
+  if (!ordersContainer || !userLine) return;
+
+  const user = getActiveUser();
+  if (!user) {
+    userLine.textContent = 'Non connecte';
+    ordersContainer.innerHTML = '<p>Connectez-vous pour voir votre historique.</p>';
+    if (loginLink) loginLink.style.display = '';
+    if (logoutBtn) logoutBtn.style.display = 'none';
+    return;
+  }
+
+  userLine.textContent = `${user.name || user.email} (${user.email || user.provider})`;
+  if (loginLink) loginLink.style.display = 'none';
+  if (logoutBtn) logoutBtn.style.display = '';
+
+  const orders = window.AgentAuth && typeof window.AgentAuth.getOrderHistory === 'function'
+    ? window.AgentAuth.getOrderHistory()
+    : [];
+
+  if (!orders.length) {
+    ordersContainer.innerHTML = '<p>Aucune commande enregistree pour le moment.</p>';
+    return;
+  }
+
+  ordersContainer.innerHTML = orders.map(order => {
+    const created = new Date(order.createdAt).toLocaleString('fr-FR');
+    const items = Array.isArray(order.items) ? order.items : [];
+    const line = items.map(it => `${it.name} x${it.quantity}`).join(', ');
+    return `
+      <div class="account-order-item">
+        <strong>${(order.totalAmount || 0).toLocaleString('fr-FR')} FCFA</strong>
+        <div>${line || 'Produit premium'}</div>
+        <div>${order.paymentMethod || 'Wave'} • ${created}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleAccountPanel() {
+  const panel = document.getElementById('account-panel');
+  if (!panel) return;
+  renderAccountOrders();
+  panel.classList.toggle('show');
+}
+
+function closeAccountPanel() {
+  const panel = document.getElementById('account-panel');
+  if (panel) panel.classList.remove('show');
+}
+
+function logoutUserFromSite() {
+  if (window.AgentAuth && typeof window.AgentAuth.logout === 'function') {
+    window.AgentAuth.logout();
+  }
+  currentUser = null;
+  localStorage.removeItem('currentUser');
+  closeAccountPanel();
+  updateUserDisplay();
 }
 
 /* ================= PAYMENT INTEGRATION ================= */
@@ -1473,6 +1564,28 @@ document.addEventListener('DOMContentLoaded', () => {
   animateCounters();
   initializeUrgencyMode();
   updateProductButtonLabels();
+  updateUserDisplay();
+  renderAccountOrders();
+
+  const dashboardToggle = document.getElementById('dashboard-toggle');
+  const accountPanel = document.getElementById('account-panel');
+  if (dashboardToggle) {
+    dashboardToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const user = getActiveUser();
+      if (!user) {
+        window.location.href = 'login.html?redirect=index.html';
+        return;
+      }
+      toggleAccountPanel();
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (!accountPanel || !accountPanel.classList.contains('show')) return;
+    if (accountPanel.contains(e.target)) return;
+    if (dashboardToggle && dashboardToggle.contains(e.target)) return;
+    closeAccountPanel();
+  });
 
   const quickModal = document.getElementById('quick-checkout-modal');
   if (quickModal) {
@@ -1486,18 +1599,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ================= ADMIN PANEL ================= */
 document.addEventListener('DOMContentLoaded', () => {
-  const dashboardToggle = document.getElementById('dashboard-toggle');
+  const adminToggle = document.getElementById('admin-toggle');
   const adminPanel = document.getElementById('admin-panel');
   const adminForm = document.getElementById('admin-form');
 
-  if (dashboardToggle && adminPanel) {
-    dashboardToggle.addEventListener('click', () => {
+  if (adminToggle && adminPanel) {
+    adminToggle.addEventListener('click', () => {
       adminPanel.classList.toggle('show');
     });
 
     // Fermer en cliquant à l'extérieur
     document.addEventListener('click', (e) => {
-      if (!adminPanel.contains(e.target) && !dashboardToggle.contains(e.target)) {
+      if (!adminPanel.contains(e.target) && !adminToggle.contains(e.target)) {
         adminPanel.classList.remove('show');
       }
     });

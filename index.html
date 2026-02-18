@@ -107,7 +107,7 @@
   </script>
 
   <!-- CSS -->
-  <link rel="stylesheet" href="style.css?v=20260217-12">
+  <link rel="stylesheet" href="style.css?v=20260217-14">
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json?v=20260217-2">
@@ -787,6 +787,21 @@
   </div>
 </div>
 
+<div class="account-panel" id="account-panel">
+  <div class="account-head">
+    <h3>Mon compte</h3>
+    <button type="button" class="account-close" onclick="closeAccountPanel()">×</button>
+  </div>
+  <p id="account-user-line">Non connecte</p>
+  <div class="account-orders" id="account-orders">
+    <p>Aucune commande enregistree.</p>
+  </div>
+  <div class="account-actions">
+    <a class="account-login-link" href="login.html?redirect=index.html">Se connecter / creer un compte</a>
+    <button type="button" class="account-logout-btn" id="account-logout-btn" onclick="logoutUserFromSite()">Se deconnecter</button>
+  </div>
+</div>
+
 <!-- ================= ADMIN PANEL ================= -->
 <div class="admin-panel" id="admin-panel">
   <h3>Panel Admin</h3>
@@ -817,6 +832,8 @@
   </div>
 </div>
 
-<script src="script.js?v=20260217-10"></script>
+<script src="auth-config.js?v=20260217-13"></script>
+<script src="auth.js?v=20260217-13"></script>
+<script src="script.js?v=20260217-12"></script>
 </body>
 </html>

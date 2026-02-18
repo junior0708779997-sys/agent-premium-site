@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion - AGENT PREMIUM</title>
+  <meta name="description" content="Connectez-vous pour conserver votre historique de commandes et d'achats.">
+  <link rel="stylesheet" href="style.css?v=20260217-13">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <main class="conditions" style="max-width:520px;margin:40px auto;">
+    <h1>Connexion client</h1>
+    <p>Connectez-vous pour conserver votre historique de commandes.</p>
+
+    <div class="auth-tabs">
+      <button id="tab-login" class="auth-tab active" type="button">Connexion</button>
+      <button id="tab-register" class="auth-tab" type="button">Creer un compte</button>
+    </div>
+
+    <form id="login-form" class="auth-card">
+      <input type="email" id="login-email" placeholder="Email" required>
+      <input type="password" id="login-password" placeholder="Mot de passe" required>
+      <button type="submit">Se connecter</button>
+    </form>
+
+    <form id="register-form" class="auth-card" style="display:none;">
+      <input type="text" id="register-name" placeholder="Nom complet" required>
+      <input type="email" id="register-email" placeholder="Email" required>
+      <input type="password" id="register-password" placeholder="Mot de passe" required>
+      <button type="submit">Creer mon compte</button>
+    </form>
+
+    <div class="auth-separator">ou</div>
+    <div id="google-login-wrap" style="display:flex;justify-content:center;"></div>
+    <p id="auth-message" style="margin-top:12px;font-size:14px;"></p>
+    <p style="margin-top:14px;"><a href="index.html">Retour a l'accueil</a></p>
+  </main>
+
+  <script src="auth-config.js?v=20260217-13"></script>
+  <script src="auth.js?v=20260217-13"></script>
+  <script>
+    const redirectTo = new URLSearchParams(window.location.search).get("redirect") || "index.html";
+    const messageEl = document.getElementById("auth-message");
+    const loginForm = document.getElementById("login-form");
+    const registerForm = document.getElementById("register-form");
+    const tabLogin = document.getElementById("tab-login");
+    const tabRegister = document.getElementById("tab-register");
+
+    function setMessage(text, ok = false) {
+      messageEl.textContent = text;
+      messageEl.style.color = ok ? "#0b7f66" : "#9a2d2d";
+    }
+
+    function showLogin() {
+      loginForm.style.display = "";
+      registerForm.style.display = "none";
+      tabLogin.classList.add("active");
+      tabRegister.classList.remove("active");
+      setMessage("");
+    }
+
+    function showRegister() {
+      loginForm.style.display = "none";
+      registerForm.style.display = "";
+      tabRegister.classList.add("active");
+      tabLogin.classList.remove("active");
+      setMessage("");
+    }
+
+    tabLogin.addEventListener("click", showLogin);
+    tabRegister.addEventListener("click", showRegister);
+
+    loginForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const email = document.getElementById("login-email").value.trim();
+      const password = document.getElementById("login-password").value;
+      const result = window.AgentAuth.loginEmail(email, password);
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      setMessage("Connexion reussie, redirection...", true);
+      setTimeout(() => window.location.href = redirectTo, 500);
+    });
+
+    registerForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = document.getElementById("register-name").value.trim();
+      const email = document.getElementById("register-email").value.trim();
+      const password = document.getElementById("register-password").value;
+      const result = window.AgentAuth.registerEmail(name, email, password);
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      setMessage("Compte cree avec succes, redirection...", true);
+      setTimeout(() => window.location.href = redirectTo, 500);
+    });
+
+    window.AgentAuth.initGoogleButton(
+      "google-login-wrap",
+      () => {
+        setMessage("Connexion Google reussie, redirection...", true);
+        setTimeout(() => window.location.href = redirectTo, 500);
+      },
+      (error) => setMessage(error || "Echec connexion Google.")
+    );
+
+    if (window.AgentAuth.getCurrentUser()) {
+      window.location.href = redirectTo;
+    }
+  </script>
+</body>
+</html>

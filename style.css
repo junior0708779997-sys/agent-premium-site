@@ -2570,6 +2570,150 @@ body::after {
     font-size: 0.9rem;
 }
 
+.auth-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 14px 0;
+}
+
+.auth-tab {
+    border: 1px solid #d6e0ef;
+    border-radius: 10px;
+    background: #f7fbff;
+    padding: 0.55rem 0.7rem;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.auth-tab.active {
+    background: #e3f6f1;
+    border-color: #8cd3c4;
+}
+
+.auth-card {
+    display: grid;
+    gap: 10px;
+}
+
+.auth-card input {
+    border: 1px solid #d4deec;
+    border-radius: 10px;
+    padding: 0.72rem 0.8rem;
+}
+
+.auth-card button {
+    border: none;
+    border-radius: 10px;
+    padding: 0.75rem 0.9rem;
+    background: linear-gradient(100deg, #0b8f7d, #13b39a);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.auth-separator {
+    margin: 14px 0 10px;
+    text-align: center;
+    color: #60708a;
+    font-size: 13px;
+}
+
+.account-panel {
+    position: fixed;
+    top: 110px;
+    right: -390px;
+    width: 360px;
+    max-height: 76vh;
+    overflow: auto;
+    z-index: 2100;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(20, 35, 65, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 16px 36px rgba(17, 32, 59, 0.2);
+    backdrop-filter: blur(8px);
+    padding: 14px;
+    transition: right 0.28s ease;
+}
+
+.account-panel.show {
+    right: 14px;
+}
+
+.account-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.account-close {
+    border: none;
+    background: transparent;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.account-orders {
+    margin-top: 8px;
+    border: 1px solid #e0e8f3;
+    border-radius: 10px;
+    padding: 8px;
+    max-height: 320px;
+    overflow: auto;
+    background: #fbfdff;
+}
+
+.account-order-item {
+    border-bottom: 1px dashed #d8e1ee;
+    padding: 7px 0;
+    font-size: 13px;
+}
+
+.account-order-item:last-child {
+    border-bottom: none;
+}
+
+.account-actions {
+    margin-top: 10px;
+    display: grid;
+    gap: 8px;
+}
+
+.account-login-link,
+.account-logout-btn {
+    border: 1px solid #d7e2ef;
+    border-radius: 10px;
+    text-align: center;
+    padding: 0.55rem 0.65rem;
+    background: #f8fbff;
+    text-decoration: none;
+    color: #1f3559;
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .account-panel {
+        left: 10px;
+        right: 10px;
+        width: auto;
+        top: auto;
+        bottom: 92px;
+        max-height: 62vh;
+        transform: translateY(10px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    .account-panel.show {
+        right: 10px;
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+}
+
 @media (max-width: 768px) {
     .hero-bg,
     .features,

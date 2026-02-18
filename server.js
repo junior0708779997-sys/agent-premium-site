@@ -11,6 +11,7 @@ app.use(express.json());
 const WAVE_API_KEY = process.env.WAVE_API_KEY || "";
 const WAVE_BASE_URL = process.env.WAVE_BASE_URL || "https://api.wave.com";
 const WAVE_WEBHOOK_SECRET = process.env.WAVE_WEBHOOK_SECRET || "";
+const backups = [];
 
 const sessions = new Map();
 
@@ -127,6 +128,22 @@ app.get("/api/wave/session/:id", (req, res) => {
   const item = sessions.get(req.params.id);
   if (!item) return res.status(404).json({ ok: false, message: "Session introuvable." });
   return res.json({ ok: true, session: item });
+});
+
+app.post("/api/backup", (req, res) => {
+  const payload = req.body || {};
+  backups.unshift({
+    id: `bkp_${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    payload
+  });
+  if (backups.length > 40) backups.length = 40;
+  return res.json({ ok: true, count: backups.length });
+});
+
+app.get("/api/backup/latest", (req, res) => {
+  if (!backups.length) return res.status(404).json({ ok: false, message: "Aucune sauvegarde." });
+  return res.json({ ok: true, backup: backups[0] });
 });
 
 app.listen(PORT, () => {

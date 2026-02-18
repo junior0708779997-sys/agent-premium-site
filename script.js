@@ -152,6 +152,53 @@ let quickCheckoutState = {
 };
 let preferredCheckoutPayment = "Wave";
 let currentCheckoutOrderId = "";
+const CONVERSION_KEY = "ap_conversion_funnel_v1";
+let conversionFunnel = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(CONVERSION_KEY)) || {
+      page_views: 0,
+      add_to_cart: 0,
+      start_checkout: 0,
+      payment_opened: 0,
+      order_confirmed: 0
+    };
+  } catch {
+    return {
+      page_views: 0,
+      add_to_cart: 0,
+      start_checkout: 0,
+      payment_opened: 0,
+      order_confirmed: 0
+    };
+  }
+})();
+
+const PRODUCT_SUGGESTIONS = {
+  "Netflix Premium": ["Spotify Premium", "YouTube Premium"],
+  "Spotify Premium": ["Deezer Premium", "YouTube Premium"],
+  "Canva Pro": ["Capcut Pro", "Adobe Pro 3 mois"],
+  "Adobe Pro 3 mois": ["Canva Pro", "Figma"],
+  "ChatGPT Plus": ["Microsoft 365", "Canva Pro"],
+  "YouTube Premium": ["Netflix Premium", "Amazon Prime Video"],
+  "Amazon Prime Video": ["Disney+", "YouTube Premium"],
+  "Crunchyroll Premium": ["Netflix Premium", "Spotify Premium"],
+  "Deezer Premium": ["Spotify Premium", "YouTube Premium"],
+  "Microsoft 365": ["ChatGPT Plus", "Canva Pro"]
+};
+
+function persistConversionFunnel() {
+  localStorage.setItem(CONVERSION_KEY, JSON.stringify(conversionFunnel));
+}
+
+function trackFunnel(eventName) {
+  if (!(eventName in conversionFunnel)) return;
+  conversionFunnel[eventName] += 1;
+  persistConversionFunnel();
+}
+
+function isMaintenanceMode() {
+  return localStorage.getItem("ap_maintenance_mode") === "1";
+}
 
 function getActiveUser() {
   if (window.AgentAuth && typeof window.AgentAuth.getCurrentUser === 'function') {
@@ -182,6 +229,10 @@ function parseProductInfo(product, fallbackAmount = 0) {
 }
 
 function openQuickCheckout(productName, amount = 0, preferredPayment = "", items = [], mode = "single") {
+  if (isMaintenanceMode()) {
+    alert("Le site est actuellement en maintenance. Reessayez dans quelques instants.");
+    return;
+  }
   const modal = document.getElementById("quick-checkout-modal");
   if (!modal) return;
   quickCheckoutState = {
@@ -194,6 +245,7 @@ function openQuickCheckout(productName, amount = 0, preferredPayment = "", items
     customerPhone: ""
   };
   modal.classList.add("show");
+  trackFunnel("start_checkout");
   renderQuickCheckoutStep(1);
 }
 
@@ -316,6 +368,7 @@ function openConfiguredPaymentLink() {
     }).then(res => res.json())
       .then(data => {
         if (data && data.launchUrl) {
+          trackFunnel("payment_opened");
           window.open(data.launchUrl, "_blank");
           return;
         }
@@ -333,7 +386,10 @@ function openConfiguredPaymentLink() {
   }
   if (window.NotificationService && typeof window.NotificationService.getPaymentLink === 'function') {
     const link = window.NotificationService.getPaymentLink(quickCheckoutState.payment);
-    if (link) window.open(link, '_blank');
+    if (link) {
+      trackFunnel("payment_opened");
+      window.open(link, '_blank');
+    }
   }
 }
 
@@ -371,6 +427,7 @@ function confirmQuickCheckout() {
   ).join("\n");
   const recordResult = recordOrderForActiveUser(quickCheckoutState.payment, quickCheckoutState.amount, orderItems);
   currentCheckoutOrderId = recordResult && recordResult.ok && recordResult.order ? recordResult.order.id : "";
+  trackFunnel("order_confirmed");
   const orderIdLine = recordResult && recordResult.ok && recordResult.order
     ? `- ID commande: ${recordResult.order.id}`
     : "- ID commande: (invite)";
@@ -1135,6 +1192,10 @@ function handleQuickChatTopic(topic) {
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 
 function addToCart(productName, price) {
+  if (isMaintenanceMode()) {
+    alert("Maintenance en cours. Ajout au panier temporairement indisponible.");
+    return;
+  }
   const existingItem = cart.find(item => item.name === productName);
   if (existingItem) {
     existingItem.quantity += 1;
@@ -1142,6 +1203,7 @@ function addToCart(productName, price) {
     cart.push({ name: productName, price: price, quantity: 1 });
   }
   localStorage.setItem('cart', JSON.stringify(cart));
+  trackFunnel("add_to_cart");
   updateCartDisplay();
   sendPushNotification('Produit ajouté', `${productName} a été ajouté à votre panier.`);
 }
@@ -1169,6 +1231,7 @@ function updateCartDisplay() {
   const cartCountBadge = document.getElementById('cart-count-badge');
   const cartTotal = document.getElementById('cart-total');
   const floatingCheckout = document.getElementById('cart-checkout-floating');
+  const suggestionsWrap = document.getElementById('cart-suggestions');
 
   if (cartItems) {
     cartItems.innerHTML = cart.map((item, index) => `
@@ -1200,6 +1263,29 @@ function updateCartDisplay() {
       ? `Passer au paiement (${totalItems})`
       : 'Passer au paiement';
   }
+
+  if (suggestionsWrap) {
+    const inCart = new Set(cart.map(i => i.name));
+    const candidates = new Set();
+    cart.forEach((item) => {
+      (PRODUCT_SUGGESTIONS[item.name] || []).forEach((s) => {
+        if (!inCart.has(s)) candidates.add(s);
+      });
+    });
+    const list = Array.from(candidates).slice(0, 4);
+    if (!list.length) {
+      suggestionsWrap.classList.remove('show');
+      suggestionsWrap.innerHTML = '';
+    } else {
+      suggestionsWrap.classList.add('show');
+      suggestionsWrap.innerHTML = `
+        <h4>Produits similaires</h4>
+        <div class="cart-suggestion-list">
+          ${list.map(name => `<button type="button" class="cart-suggestion-item" data-suggest="${name}">${name}</button>`).join('')}
+        </div>
+      `;
+    }
+  }
 }
 
 function toggleCart() {
@@ -1219,6 +1305,14 @@ function checkout() {
     return;
   }
   openCartCheckout(preferredCheckoutPayment);
+}
+
+function getPriceFromCard(productName) {
+  const cards = Array.from(document.querySelectorAll('.product-card'));
+  const card = cards.find(c => (c.querySelector('h3')?.textContent || '').trim() === productName);
+  if (!card) return 0;
+  const text = card.querySelector('.price')?.textContent || '';
+  return parseInt(text.replace(/[^\d]/g, ''), 10) || 0;
 }
 
 /* ================= PRODUCT SEARCH/FILTER ================= */
@@ -1498,8 +1592,16 @@ function renderAdminOrders() {
       <span>Livrees: ${delivered}</span>
       <span>CA encaisse: ${revenue.toLocaleString('fr-FR')} FCFA</span>
       <span>Cmd aujourd'hui: ${todayCount}</span>
-      <button type="button" onclick="exportAdminOrdersCsv()">Exporter CSV</button>
+      <span>Ajouts panier: ${conversionFunnel.add_to_cart || 0}</span>
+      <span>Checkouts: ${conversionFunnel.start_checkout || 0}</span>
+      <span>Paiements ouverts: ${conversionFunnel.payment_opened || 0}</span>
+      <span>Cmd confirmees: ${conversionFunnel.order_confirmed || 0}</span>
+      <button type="button" id="admin-export-csv-btn">Exporter CSV</button>
     `;
+    const csvBtn = document.getElementById('admin-export-csv-btn');
+    if (csvBtn) {
+      csvBtn.addEventListener('click', exportAdminOrdersCsv);
+    }
   }
   if (!filtered.length) {
     list.innerHTML = '<p>Aucune commande.</p>';
@@ -1507,11 +1609,11 @@ function renderAdminOrders() {
   }
 
   list.innerHTML = filtered.map(order => `
-    <div class="admin-order-item">
+    <div class="admin-order-item" data-order-id="${order.id}" data-owner-id="${order.ownerId || ''}">
       <strong>${order.userName || order.userEmail}</strong><br>
       <span>${(order.totalAmount || 0).toLocaleString('fr-FR')} FCFA • ${new Date(order.createdAt).toLocaleString('fr-FR')}</span><br>
       <span>ID: ${order.id}</span>
-      <select onchange="updateAdminOrderStatus('${order.id}', this.value, '${order.ownerId || ''}')">
+      <select>
         <option value="en_attente" ${order.status === 'en_attente' ? 'selected' : ''}>En attente</option>
         <option value="payee" ${order.status === 'payee' ? 'selected' : ''}>Payee</option>
         <option value="livree" ${order.status === 'livree' ? 'selected' : ''}>Livree</option>
@@ -1565,6 +1667,184 @@ function exportAdminOrdersCsv() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+function getBackupPayload() {
+  const keys = [
+    "ap_users_v2",
+    "ap_current_user_v2",
+    "ap_backend_users_mirror",
+    "ap_backend_orders_mirror",
+    "ap_backend_favorites_mirror",
+    "cart",
+    CONVERSION_KEY
+  ];
+  const data = {};
+  keys.forEach((k) => {
+    data[k] = localStorage.getItem(k);
+  });
+  return {
+    createdAt: new Date().toISOString(),
+    site: "agent-premium",
+    data
+  };
+}
+
+function exportLocalBackup() {
+  const payload = getBackupPayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `backup-agent-premium-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function syncCloudBackup() {
+  const cfg = window.APP_CONFIG || {};
+  const apiBase = String(cfg.apiBaseUrl || "").trim();
+  if (!apiBase) {
+    alert("apiBaseUrl non configure dans backend-config.js");
+    return;
+  }
+  const res = await fetch(`${apiBase.replace(/\/$/, "")}/api/backup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(getBackupPayload())
+  }).catch(() => null);
+  if (!res || !res.ok) {
+    alert("Echec sauvegarde cloud.");
+    return;
+  }
+  alert("Sauvegarde cloud envoyee.");
+}
+
+function applyAnnouncementFromStorage() {
+  const node = document.getElementById("site-announcement");
+  if (!node) return;
+  const maintenance = localStorage.getItem("ap_maintenance_mode") === "1";
+  const promoText = localStorage.getItem("ap_promo_banner") || "";
+  if (maintenance) {
+    node.textContent = "Maintenance en cours. Certaines fonctions peuvent etre ralenties.";
+    node.classList.add("show");
+    return;
+  }
+  if (promoText) {
+    node.textContent = promoText;
+    node.classList.add("show");
+    return;
+  }
+  node.classList.remove("show");
+  node.textContent = "";
+}
+
+function initAdminTools() {
+  const maintenanceToggle = document.getElementById("maintenance-toggle");
+  const promoInput = document.getElementById("promo-banner-text");
+  const promoSave = document.getElementById("save-promo-banner");
+  const backupExportBtn = document.getElementById("backup-export-btn");
+  const backupCloudBtn = document.getElementById("backup-cloud-btn");
+
+  if (maintenanceToggle) {
+    maintenanceToggle.checked = localStorage.getItem("ap_maintenance_mode") === "1";
+    maintenanceToggle.addEventListener("change", () => {
+      localStorage.setItem("ap_maintenance_mode", maintenanceToggle.checked ? "1" : "0");
+      applyAnnouncementFromStorage();
+    });
+  }
+  if (promoInput) {
+    promoInput.value = localStorage.getItem("ap_promo_banner") || "";
+  }
+  if (promoSave) {
+    promoSave.addEventListener("click", () => {
+      const text = (promoInput?.value || "").trim();
+      localStorage.setItem("ap_promo_banner", text);
+      applyAnnouncementFromStorage();
+    });
+  }
+  if (backupExportBtn) {
+    backupExportBtn.addEventListener("click", exportLocalBackup);
+  }
+  if (backupCloudBtn) {
+    backupCloudBtn.addEventListener("click", () => {
+      syncCloudBackup().catch(() => alert("Erreur sauvegarde cloud."));
+    });
+  }
+}
+
+function migrateLegacyInlineHandlers() {
+  document.querySelectorAll("[onclick]").forEach((el) => {
+    const action = (el.getAttribute("onclick") || "").trim();
+    if (!action) return;
+    el.removeAttribute("onclick");
+
+    if (action.includes("orderProduct(")) {
+      const match = action.match(/orderProduct\('([^']+)'/);
+      if (match) el.addEventListener("click", () => orderProduct(match[1]));
+      return;
+    }
+    if (action.includes("payWithWave(")) {
+      const match = action.match(/payWithWave\('([^']+)'[, ]+([0-9]+)/);
+      if (match) el.addEventListener("click", () => payWithWave(match[1], parseInt(match[2], 10) || 0));
+      return;
+    }
+    if (action.includes("shareOnFacebook")) return el.addEventListener("click", (e) => { e.preventDefault(); shareOnFacebook(); });
+    if (action.includes("shareOnTwitter")) return el.addEventListener("click", (e) => { e.preventDefault(); shareOnTwitter(); });
+    if (action.includes("shareOnWhatsApp")) return el.addEventListener("click", (e) => { e.preventDefault(); shareOnWhatsApp(); });
+    if (action.includes("toggleCart")) return el.addEventListener("click", toggleCart);
+    if (action.includes("checkout()")) return el.addEventListener("click", checkout);
+    if (action.includes("continueShopping()")) return el.addEventListener("click", continueShopping);
+    if (action.includes("toggleChat()")) return el.addEventListener("click", toggleChat);
+    if (action.includes("closeChat()")) return el.addEventListener("click", closeChat);
+    if (action.includes("sendChatMessage()")) return el.addEventListener("click", sendChatMessage);
+    if (action.includes("closeAccountPanel()")) return el.addEventListener("click", closeAccountPanel);
+    if (action.includes("logoutUserFromSite()")) return el.addEventListener("click", logoutUserFromSite);
+    if (action.includes("acceptCookies()")) return el.addEventListener("click", acceptCookies);
+    if (action.includes("rejectCookies()")) return el.addEventListener("click", rejectCookies);
+    if (action.includes("closeQuickCheckout()")) return el.addEventListener("click", closeQuickCheckout);
+    if (action.includes("handleQuickChatTopic(")) {
+      const topic = action.match(/handleQuickChatTopic\('([^']+)'\)/)?.[1];
+      if (topic) el.addEventListener("click", () => handleQuickChatTopic(topic));
+      return;
+    }
+    if (action.includes("document.getElementById('products').scrollIntoView")) {
+      return el.addEventListener("click", () => document.getElementById("products")?.scrollIntoView({ behavior: "smooth" }));
+    }
+  });
+
+  const chatInput = document.getElementById("chat-input");
+  if (chatInput) {
+    chatInput.removeAttribute("onkeypress");
+    chatInput.addEventListener("keypress", handleChatKeyPress);
+  }
+  const searchInput = document.getElementById("search-input");
+  if (searchInput) {
+    searchInput.removeAttribute("oninput");
+    searchInput.addEventListener("input", filterProducts);
+  }
+  const categoryFilter = document.getElementById("category-filter");
+  if (categoryFilter) {
+    categoryFilter.removeAttribute("onchange");
+    categoryFilter.addEventListener("change", filterProducts);
+  }
+  const sortSelect = document.getElementById("sort-products");
+  if (sortSelect) {
+    sortSelect.removeAttribute("onchange");
+    sortSelect.addEventListener("change", sortProducts);
+  }
+  const adminSearch = document.getElementById("admin-order-search");
+  if (adminSearch) {
+    adminSearch.removeAttribute("oninput");
+    adminSearch.addEventListener("input", renderAdminOrders);
+  }
+  const adminFilter = document.getElementById("admin-order-filter");
+  if (adminFilter) {
+    adminFilter.removeAttribute("onchange");
+    adminFilter.addEventListener("change", renderAdminOrders);
+  }
 }
 
 /* ================= PAYMENT INTEGRATION ================= */
@@ -1922,6 +2202,8 @@ function applyPerformanceEnhancements() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  trackFunnel('page_views');
+  migrateLegacyInlineHandlers();
   normalizeProductCopy();
   normalizeProductPrices();
   injectProductDetails();
@@ -1929,10 +2211,33 @@ document.addEventListener('DOMContentLoaded', () => {
   applyPerformanceEnhancements();
   initVerifiedReviewComposer();
   initializeUrgencyMode();
+  applyAnnouncementFromStorage();
+  initAdminTools();
   updateProductButtonLabels();
   updateUserDisplay();
   renderAccountOrders();
   renderAdminOrders();
+
+  document.addEventListener('click', (e) => {
+    const suggest = e.target.closest('[data-suggest]');
+    if (suggest) {
+      const name = suggest.getAttribute('data-suggest');
+      const price = getPriceFromCard(name);
+      if (name && price) addToCart(name, price);
+      return;
+    }
+    const statusSelect = e.target.closest('.admin-order-item select');
+    if (statusSelect) return;
+  });
+
+  document.addEventListener('change', (e) => {
+    const statusSelect = e.target.closest('.admin-order-item select');
+    if (!statusSelect) return;
+    const item = statusSelect.closest('.admin-order-item');
+    const orderId = item?.getAttribute('data-order-id');
+    const ownerId = item?.getAttribute('data-owner-id') || '';
+    if (orderId) updateAdminOrderStatus(orderId, statusSelect.value, ownerId);
+  });
 
   const dashboardToggle = document.getElementById('dashboard-toggle');
   const accountPanel = document.getElementById('account-panel');

@@ -109,14 +109,14 @@
   </script>
 
   <!-- CSS -->
-  <link rel="stylesheet" href="style.css?v=20260218-7">
+  <link rel="stylesheet" href="style.css?v=20260218-8">
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json?v=20260217-2">
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=20260218-7').catch((error) => {
+        navigator.serviceWorker.register('sw.js?v=20260218-8').catch((error) => {
           console.error('Erreur service worker:', error);
         });
       });
@@ -143,6 +143,7 @@
   <span class="topbar-chip">⚡ Livraison en moins de 5 min</span>
   <span class="topbar-chip">🔒 Paiement sécurisé: Wave / Orange Money / MTN MoMo</span>
 </div>
+<div class="site-announcement" id="site-announcement"></div>
 
 <!-- ================= HEADER ================= -->
 <header class="navbar">
@@ -733,6 +734,7 @@
   <div class="cart-items" id="cart-items">
     <!-- Cart items will be added here -->
   </div>
+  <div class="cart-suggestions" id="cart-suggestions"></div>
   <div class="cart-total">
     Total: <span id="cart-total">0 FCFA</span>
   </div>
@@ -823,6 +825,20 @@
     <textarea placeholder="Description" rows="3"></textarea>
     <button type="submit">Ajouter Produit</button>
   </form>
+  <div class="admin-tools" id="admin-tools">
+    <h4>Outils boutique</h4>
+    <div class="admin-tool-row">
+      <label><input type="checkbox" id="maintenance-toggle"> Mode maintenance</label>
+    </div>
+    <div class="admin-tool-row">
+      <input type="text" id="promo-banner-text" placeholder="Texte bandeau promo (optionnel)">
+      <button type="button" id="save-promo-banner">Publier bandeau</button>
+    </div>
+    <div class="admin-tool-row">
+      <button type="button" id="backup-export-btn">Exporter sauvegarde JSON</button>
+      <button type="button" id="backup-cloud-btn">Sync sauvegarde cloud</button>
+    </div>
+  </div>
   <div class="admin-orders" id="admin-orders">
     <h4>Suivi commandes</h4>
     <div class="admin-order-toolbar">
@@ -864,11 +880,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="backend-config.js?v=20260218-7"></script>
-<script src="backend.js?v=20260218-7"></script>
-<script src="notifications.js?v=20260218-7"></script>
-<script src="auth-config.js?v=20260218-7"></script>
-<script src="auth.js?v=20260218-7"></script>
-<script src="script.js?v=20260218-7"></script>
+<script src="backend-config.js?v=20260218-8"></script>
+<script src="backend.js?v=20260218-8"></script>
+<script src="notifications.js?v=20260218-8"></script>
+<script src="auth-config.js?v=20260218-8"></script>
+<script src="auth.js?v=20260218-8"></script>
+<script src="script.js?v=20260218-8"></script>
 </body>
 </html>

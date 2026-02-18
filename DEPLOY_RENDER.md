@@ -32,3 +32,7 @@ Puis dans `backend-config.js` mets:
 
 ## 7. Si le paiement direct ne passe pas
 - Le site utilisera automatiquement le fallback `paymentLinks.wave|orange|mtn` de `backend-config.js`.
+
+## 8. Sauvegarde cloud
+- Endpoint sauvegarde: `POST /api/backup`
+- Endpoint lecture: `GET /api/backup/latest`

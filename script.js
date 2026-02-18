@@ -202,6 +202,9 @@ const PRODUCT_SUGGESTIONS = {
   "Deezer Premium": ["Spotify Premium", "YouTube Premium"],
   "Microsoft 365": ["ChatGPT Plus", "Canva Pro"]
 };
+const CUSTOM_CATALOG_KEY = "ap_custom_catalog_v1";
+const PRODUCTS_PER_PAGE = 8;
+let currentProductsPage = 1;
 
 function persistConversionFunnel() {
   localStorage.setItem(CONVERSION_KEY, JSON.stringify(conversionFunnel));
@@ -1336,6 +1339,154 @@ function getPriceFromCard(productName) {
   return parseInt(text.replace(/[^\d]/g, ''), 10) || 0;
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getCustomCatalog() {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_CATALOG_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomCatalog(list) {
+  localStorage.setItem(CUSTOM_CATALOG_KEY, JSON.stringify(list || []));
+}
+
+function createCustomProductCard(product) {
+  const card = document.createElement("div");
+  card.className = `product-card custom-item fade-up ${product.category || "custom"}`;
+  card.dataset.custom = "1";
+  const amount = parseInt(product.price, 10) || 0;
+  const title = escapeHtml(product.name || "Produit premium");
+  const desc = escapeHtml(product.desc || "Nouveau produit premium");
+  card.innerHTML = `
+    <h3>${title}</h3>
+    <p>${desc}</p>
+    <span class="price">${amount.toLocaleString('fr-FR')} FCFA / mois</span>
+    <button type="button" class="custom-buy-btn">Acheter</button>
+    <button type="button" class="wave-btn custom-wave-btn">Payer avec Wave</button>
+  `;
+  const buyBtn = card.querySelector(".custom-buy-btn");
+  const waveBtn = card.querySelector(".custom-wave-btn");
+  if (buyBtn) buyBtn.addEventListener("click", () => orderProduct(`${product.name} - ${amount} FCFA`));
+  if (waveBtn) waveBtn.addEventListener("click", () => payWithWave(product.name, amount));
+  return card;
+}
+
+function renderCustomCatalog() {
+  const list = getCustomCatalog();
+  const container = document.getElementById("product-list");
+  if (!container) return;
+  container.querySelectorAll('[data-custom="1"]').forEach((node) => node.remove());
+  list.forEach((p) => {
+    container.appendChild(createCustomProductCard(p));
+  });
+  currentProductsPage = 1;
+  applyProductPagination();
+}
+
+function addCustomProduct(name, price, desc, category = "custom") {
+  const amount = parseInt(price, 10) || 0;
+  if (!name || !amount) return { ok: false, message: "Nom et prix requis." };
+  const list = getCustomCatalog();
+  list.push({
+    id: `prd_${Date.now()}_${Math.floor(Math.random() * 999)}`,
+    name: String(name).trim(),
+    price: amount,
+    desc: String(desc || "").trim(),
+    category: String(category || "custom").trim().toLowerCase()
+  });
+  saveCustomCatalog(list);
+  renderCustomCatalog();
+  return { ok: true };
+}
+
+function exportCatalogJson() {
+  const payload = {
+    createdAt: new Date().toISOString(),
+    customCatalog: getCustomCatalog()
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `catalogue-agent-premium-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importCatalogJson(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || "{}"));
+      const list = Array.isArray(parsed.customCatalog) ? parsed.customCatalog : [];
+      const sanitized = list
+        .map((p) => ({
+          id: p.id || `prd_${Date.now()}_${Math.floor(Math.random() * 999)}`,
+          name: String(p.name || "").trim(),
+          price: parseInt(p.price, 10) || 0,
+          desc: String(p.desc || "").trim(),
+          category: String(p.category || "custom").trim().toLowerCase()
+        }))
+        .filter((p) => p.name && p.price > 0);
+      saveCustomCatalog(sanitized);
+      renderCustomCatalog();
+      alert("Catalogue importe avec succes.");
+    } catch {
+      alert("Fichier catalogue invalide.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function applyProductPagination(page = currentProductsPage) {
+  const container = document.getElementById("product-list");
+  const pager = document.getElementById("product-pagination");
+  if (!container || !pager) return;
+  const cards = Array.from(container.querySelectorAll(".product-card"));
+  const visible = cards.filter((c) => c.style.display !== "none");
+  const totalPages = Math.max(1, Math.ceil(visible.length / PRODUCTS_PER_PAGE));
+  currentProductsPage = Math.min(Math.max(1, page), totalPages);
+  const start = (currentProductsPage - 1) * PRODUCTS_PER_PAGE;
+  const end = start + PRODUCTS_PER_PAGE;
+
+  let visibleIndex = 0;
+  cards.forEach((card) => {
+    if (card.style.display === "none") return;
+    const show = visibleIndex >= start && visibleIndex < end;
+    card.style.visibility = show ? "" : "hidden";
+    card.style.position = show ? "" : "absolute";
+    card.style.pointerEvents = show ? "" : "none";
+    card.style.height = show ? "" : "0";
+    card.style.margin = show ? "" : "0";
+    card.style.padding = show ? "" : "0";
+    visibleIndex += 1;
+  });
+
+  if (visible.length <= PRODUCTS_PER_PAGE) {
+    pager.innerHTML = "";
+    return;
+  }
+
+  const buttons = [];
+  for (let i = 1; i <= totalPages; i += 1) {
+    buttons.push(`<button type="button" class="page-btn ${i === currentProductsPage ? "active" : ""}" data-page="${i}">${i}</button>`);
+  }
+  pager.innerHTML = buttons.join("");
+}
+
 /* ================= PRODUCT SEARCH/FILTER ================= */
 function filterProducts() {
   const searchInput = document.getElementById('search-input');
@@ -1356,6 +1507,7 @@ function filterProducts() {
       product.style.display = 'none';
     }
   });
+  applyProductPagination(1);
 }
 
 function sortProducts() {
@@ -1383,6 +1535,7 @@ function sortProducts() {
   }
 
   cards.forEach(card => container.appendChild(card));
+  applyProductPagination(1);
 }
 
 function updateProductButtonLabels() {
@@ -1579,7 +1732,7 @@ function renderAdminOrders() {
   const panel = document.getElementById('admin-panel');
   if (!list || !panel) return;
   const user = getActiveUser();
-  const isAdmin = !!(user && user.email && /admin/i.test(user.email));
+  const isAdmin = !!(user && user.role === 'admin');
   panel.style.display = isAdmin ? '' : 'none';
   if (!isAdmin) return;
 
@@ -2227,7 +2380,9 @@ document.addEventListener('DOMContentLoaded', () => {
   migrateLegacyInlineHandlers();
   normalizeProductCopy();
   normalizeProductPrices();
+  renderCustomCatalog();
   injectProductDetails();
+  applyProductPagination(1);
   animateCounters();
   applyPerformanceEnhancements();
   initVerifiedReviewComposer();
@@ -2240,6 +2395,12 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAdminOrders();
 
   document.addEventListener('click', (e) => {
+    const pageBtn = e.target.closest('.page-btn');
+    if (pageBtn) {
+      const page = parseInt(pageBtn.getAttribute('data-page'), 10) || 1;
+      applyProductPagination(page);
+      return;
+    }
     const suggest = e.target.closest('[data-suggest]');
     if (suggest) {
       const name = suggest.getAttribute('data-suggest');
@@ -2300,6 +2461,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const adminToggle = document.getElementById('admin-toggle');
   const adminPanel = document.getElementById('admin-panel');
   const adminForm = document.getElementById('admin-form');
+  const catalogExportBtn = document.getElementById('catalog-export-btn');
+  const catalogImportBtn = document.getElementById('catalog-import-btn');
+  const catalogImportFile = document.getElementById('catalog-import-file');
 
   if (adminToggle && adminPanel) {
     adminToggle.addEventListener('click', () => {
@@ -2321,12 +2485,29 @@ document.addEventListener('DOMContentLoaded', () => {
       const price = adminForm.querySelector('input[type="number"]').value;
       const desc = adminForm.querySelector('textarea').value;
 
-      if (name && price) {
-        // Simulation d'ajout de produit
-        alert(`Produit "${name}" ajouté avec succès !`);
+      const result = addCustomProduct(name, price, desc);
+      if (result.ok) {
+        alert(`Produit "${name}" ajoute avec succes !`);
         adminForm.reset();
         if (adminPanel) adminPanel.classList.remove('show');
+      } else {
+        alert(result.message || "Impossible d'ajouter le produit.");
       }
+    });
+  }
+
+  if (catalogExportBtn) {
+    catalogExportBtn.addEventListener('click', exportCatalogJson);
+  }
+  if (catalogImportBtn) {
+    catalogImportBtn.addEventListener('click', () => {
+      const file = catalogImportFile?.files?.[0];
+      if (!file) {
+        alert("Selectionnez un fichier JSON.");
+        return;
+      }
+      importCatalogJson(file);
+      if (catalogImportFile) catalogImportFile.value = "";
     });
   }
 });

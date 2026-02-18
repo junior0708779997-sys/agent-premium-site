@@ -109,14 +109,14 @@
   </script>
 
   <!-- CSS -->
-  <link rel="stylesheet" href="style.css?v=20260218-9">
+  <link rel="stylesheet" href="style.css?v=20260218-10">
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json?v=20260217-2">
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=20260218-9').catch((error) => {
+        navigator.serviceWorker.register('sw.js?v=20260218-10').catch((error) => {
           console.error('Erreur service worker:', error);
         });
       });
@@ -471,6 +471,7 @@
     </div>
 
   </div>
+  <div class="product-pagination" id="product-pagination"></div>
 </section>
 
 <section class="offer-highlight fade-up" id="offer-highlight">
@@ -841,6 +842,11 @@
       <button type="button" id="backup-export-btn">Exporter sauvegarde JSON</button>
       <button type="button" id="backup-cloud-btn">Sync sauvegarde cloud</button>
     </div>
+    <div class="admin-tool-row">
+      <button type="button" id="catalog-export-btn">Exporter catalogue JSON</button>
+      <input type="file" id="catalog-import-file" accept=".json">
+      <button type="button" id="catalog-import-btn">Importer catalogue</button>
+    </div>
   </div>
   <div class="admin-orders" id="admin-orders">
     <h4>Suivi commandes</h4>
@@ -883,11 +889,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="backend-config.js?v=20260218-9"></script>
-<script src="backend.js?v=20260218-9"></script>
-<script src="notifications.js?v=20260218-9"></script>
-<script src="auth-config.js?v=20260218-9"></script>
-<script src="auth.js?v=20260218-9"></script>
-<script src="script.js?v=20260218-9"></script>
+<script src="backend-config.js?v=20260218-10"></script>
+<script src="backend.js?v=20260218-10"></script>
+<script src="notifications.js?v=20260218-10"></script>
+<script src="auth-config.js?v=20260218-10"></script>
+<script src="auth.js?v=20260218-10"></script>
+<script src="script.js?v=20260218-10"></script>
 </body>
 </html>

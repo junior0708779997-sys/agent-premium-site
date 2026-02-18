@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connexion - AGENT PREMIUM</title>
   <meta name="description" content="Connectez-vous pour conserver votre historique de commandes et d'achats.">
-  <link rel="stylesheet" href="style.css?v=20260218-9">
+  <link rel="stylesheet" href="style.css?v=20260218-10">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -36,15 +36,20 @@
 
     <div class="auth-separator" id="auth-separator">ou</div>
     <div id="google-login-wrap" style="display:flex;justify-content:center;"></div>
+    <form id="reset-token-form" class="auth-card" style="display:none;">
+      <input type="password" id="reset-new-password" placeholder="Nouveau mot de passe (8+)" required>
+      <input type="password" id="reset-confirm-password" placeholder="Confirmer mot de passe" required>
+      <button type="submit">Valider le nouveau mot de passe</button>
+    </form>
     <p id="auth-message" style="margin-top:12px;font-size:14px;"></p>
     <p style="margin-top:14px;"><a href="index.html">Retour a l'accueil</a></p>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="backend-config.js?v=20260218-9"></script>
-  <script src="backend.js?v=20260218-9"></script>
-  <script src="auth-config.js?v=20260218-9"></script>
-  <script src="auth.js?v=20260218-9"></script>
+  <script src="backend-config.js?v=20260218-10"></script>
+  <script src="backend.js?v=20260218-10"></script>
+  <script src="auth-config.js?v=20260218-10"></script>
+  <script src="auth.js?v=20260218-10"></script>
   <script>
     const redirectTo = new URLSearchParams(window.location.search).get("redirect") || "index.html";
     const messageEl = document.getElementById("auth-message");
@@ -53,6 +58,7 @@
     const registerForm = document.getElementById("register-form");
     const tabLogin = document.getElementById("tab-login");
     const tabRegister = document.getElementById("tab-register");
+    const resetTokenForm = document.getElementById("reset-token-form");
     const humanLabel = document.getElementById("human-check-label");
     const humanInput = document.getElementById("human-check-input");
     let humanA = 0;
@@ -173,9 +179,70 @@
     }
     refreshHumanCheck();
 
+    const params = new URLSearchParams(window.location.search);
+    const resetToken = params.get("reset_token");
+    const resetEmail = params.get("email");
+
+    if (resetToken && resetEmail) {
+      loginForm.style.display = "none";
+      registerForm.style.display = "none";
+      if (resetTokenForm) resetTokenForm.style.display = "";
+      setMessage("Lien de reinitialisation detecte. Entrez votre nouveau mot de passe.");
+    }
+
+    if (resetTokenForm) {
+      resetTokenForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const p1 = document.getElementById("reset-new-password").value;
+        const p2 = document.getElementById("reset-confirm-password").value;
+        if (p1 !== p2) {
+          setMessage("Les mots de passe ne correspondent pas.");
+          return;
+        }
+        const cfg = window.APP_CONFIG || {};
+        const apiBase = String(cfg.apiBaseUrl || "").trim();
+        if (apiBase && resetToken && resetEmail) {
+          const verifyRes = await fetch(`${apiBase.replace(/\/$/, "")}/api/auth/verify-reset-token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: resetToken, email: resetEmail })
+          }).then(r => r.json()).catch(() => ({ ok: false }));
+          if (!verifyRes.ok) {
+            setMessage(verifyRes.message || "Lien invalide ou expire.");
+            return;
+          }
+        }
+        const result = await window.AgentAuth.resetPasswordEmail(resetEmail || "", p1);
+        if (!result.ok) {
+          setMessage(result.message);
+          return;
+        }
+        if (apiBase && resetToken && resetEmail) {
+          await fetch(`${apiBase.replace(/\/$/, "")}/api/auth/consume-reset-token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: resetToken, email: resetEmail })
+          }).catch(() => {});
+        }
+        setMessage("Mot de passe mis a jour. Connectez-vous maintenant.", true);
+        setTimeout(() => window.location.href = "login.html", 900);
+      });
+    }
+
     resetBtn.addEventListener("click", async () => {
       const email = prompt("Entrez votre email:");
       if (!email) return;
+      const cfg = window.APP_CONFIG || {};
+      const apiBase = String(cfg.apiBaseUrl || "").trim();
+      if (apiBase) {
+        const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/auth/request-reset`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        }).then(r => r.json()).catch(() => ({ ok: false, message: "Service indisponible." }));
+        setMessage(response.ok ? "Email de reinitialisation envoye." : (response.message || "Erreur reset."));
+        return;
+      }
       const newPwd = prompt("Entrez votre nouveau mot de passe:");
       if (!newPwd) return;
       const result = await window.AgentAuth.resetPasswordEmail(email, newPwd);

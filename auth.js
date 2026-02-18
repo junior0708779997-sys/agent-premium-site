@@ -18,6 +18,18 @@
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
   }
 
+  function ensureUsersRole() {
+    const users = loadUsers();
+    let changed = false;
+    users.forEach((u) => {
+      if (!u.role) {
+        u.role = /admin/i.test(String(u.email || "")) ? "admin" : "customer";
+        changed = true;
+      }
+    });
+    if (changed) saveUsers(users);
+  }
+
   function normalizeEmail(email) {
     return String(email || "").trim().toLowerCase();
   }
@@ -47,7 +59,12 @@
 
   function getCurrentUser() {
     try {
-      return JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
+      const user = JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
+      if (user && !user.role) {
+        user.role = /admin/i.test(String(user.email || "")) ? "admin" : "customer";
+        setCurrentUser(user);
+      }
+      return user;
     } catch {
       return null;
     }
@@ -78,6 +95,7 @@
     const user = {
       id: "email_" + safeIdFromEmail(cleanEmail),
       provider: "email",
+      role: "customer",
       name: cleanName,
       email: cleanEmail,
       passwordHash: await sha256Hex(password),
@@ -89,7 +107,7 @@
       window.AgentBackend.saveUser(user).catch(() => {});
     }
 
-    const sessionUser = { id: user.id, provider: user.provider, name: user.name, email: user.email };
+    const sessionUser = { id: user.id, provider: user.provider, role: user.role, name: user.name, email: user.email };
     setCurrentUser(sessionUser);
     return { ok: true, user: sessionUser };
   }
@@ -108,7 +126,7 @@
     if (!user) {
       return { ok: false, message: "Email ou mot de passe invalide." };
     }
-    const sessionUser = { id: user.id, provider: user.provider, name: user.name, email: user.email };
+    const sessionUser = { id: user.id, provider: user.provider, role: user.role || "customer", name: user.name, email: user.email };
     setCurrentUser(sessionUser);
     return { ok: true, user: sessionUser };
   }
@@ -157,6 +175,7 @@
     const sessionUser = {
       id: "google_" + safeIdFromEmail(payload.email),
       provider: "google",
+      role: "customer",
       name: payload.name || payload.given_name || payload.email.split("@")[0],
       email: normalizeEmail(payload.email),
       picture: payload.picture || ""
@@ -273,7 +292,7 @@
 
   function getAllOrdersForAdmin() {
     const user = getCurrentUser();
-    if (!user || !user.email || !/admin/i.test(user.email)) return [];
+    if (!user || user.role !== "admin") return [];
 
     if (window.AgentBackend && typeof window.AgentBackend.getAllOrdersForAdmin === "function") {
       const backendOrders = window.AgentBackend.getAllOrdersForAdmin();
@@ -328,6 +347,28 @@
     return { ok: true, favorites };
   }
 
+  function setUserRole(targetEmail, role) {
+    const current = getCurrentUser();
+    if (!current || current.role !== "admin") {
+      return { ok: false, message: "Action reservee admin." };
+    }
+    const cleanEmail = normalizeEmail(targetEmail);
+    const allowed = ["customer", "admin"];
+    if (!allowed.includes(role)) {
+      return { ok: false, message: "Role invalide." };
+    }
+    const users = loadUsers();
+    const idx = users.findIndex((u) => u.email === cleanEmail);
+    if (idx < 0) return { ok: false, message: "Utilisateur introuvable." };
+    users[idx].role = role;
+    users[idx].updatedAt = new Date().toISOString();
+    saveUsers(users);
+    if (window.AgentBackend && typeof window.AgentBackend.saveUser === "function") {
+      window.AgentBackend.saveUser(users[idx]).catch(() => {});
+    }
+    return { ok: true, user: users[idx] };
+  }
+
   window.AgentAuth = {
     getCurrentUser,
     loginEmail,
@@ -340,6 +381,9 @@
     updateOrderStatus,
     getAllOrdersForAdmin,
     getFavorites,
-    toggleFavorite
+    toggleFavorite,
+    setUserRole
   };
+
+  ensureUsersRole();
 })();

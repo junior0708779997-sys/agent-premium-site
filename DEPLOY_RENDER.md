@@ -14,6 +14,9 @@
 - `WAVE_API_KEY` = ta cle Wave Business (obligatoire)
 - `WAVE_WEBHOOK_SECRET` = secret webhook Wave (obligatoire pour verifier signature)
 - `WAVE_BASE_URL` = `https://api.wave.com`
+- `RESEND_API_KEY` = cle API Resend (pour reset mot de passe par email)
+- `RESET_FROM_EMAIL` = expediteur verifie (ex: `no-reply@tondomaine.com`)
+- `FRONTEND_BASE_URL` = URL publique du site (ex: `https://agent-premium.onrender.com`)
 - `PORT` = laisser vide (Render le gere)
 
 ## 4. URL a copier dans le front
@@ -36,3 +39,8 @@ Puis dans `backend-config.js` mets:
 ## 8. Sauvegarde cloud
 - Endpoint sauvegarde: `POST /api/backup`
 - Endpoint lecture: `GET /api/backup/latest`
+
+## 9. Reset mot de passe par email
+- Demande lien: `POST /api/auth/request-reset`
+- Verifier token: `POST /api/auth/verify-reset-token`
+- Consommer token: `POST /api/auth/consume-reset-token`

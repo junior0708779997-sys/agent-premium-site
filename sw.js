@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agent-premium-v7';
+const CACHE_NAME = 'agent-premium-v8';
 const urlsToCache = [
   '/',
   '/index.html',

@@ -3671,6 +3671,13 @@ body::after {
     min-width: 180px;
 }
 
+.admin-tool-row input[type="file"] {
+    border: 1px solid #d4ddea;
+    border-radius: 8px;
+    background: #fff;
+    padding: 0.35rem 0.45rem;
+}
+
 .admin-tool-row button {
     border: 1px solid #d4ddea;
     border-radius: 8px;
@@ -3678,6 +3685,30 @@ body::after {
     color: #fff;
     padding: 0.35rem 0.6rem;
     cursor: pointer;
+}
+
+.product-pagination {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+
+.page-btn {
+    border: 1px solid #d6e1f2;
+    border-radius: 8px;
+    background: #fff;
+    color: #1f3559;
+    min-width: 36px;
+    height: 34px;
+    cursor: pointer;
+}
+
+.page-btn.active {
+    background: #1f3559;
+    color: #fff;
+    border-color: #1f3559;
 }
 
 /* ================= RESPONSIVE HARDENING ================= */

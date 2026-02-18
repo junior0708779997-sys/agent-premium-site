@@ -11,7 +11,11 @@ app.use(express.json());
 const WAVE_API_KEY = process.env.WAVE_API_KEY || "";
 const WAVE_BASE_URL = process.env.WAVE_BASE_URL || "https://api.wave.com";
 const WAVE_WEBHOOK_SECRET = process.env.WAVE_WEBHOOK_SECRET || "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const RESET_FROM_EMAIL = process.env.RESET_FROM_EMAIL || "";
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "";
 const backups = [];
+const resetTokens = new Map();
 
 const sessions = new Map();
 
@@ -144,6 +148,68 @@ app.post("/api/backup", (req, res) => {
 app.get("/api/backup/latest", (req, res) => {
   if (!backups.length) return res.status(404).json({ ok: false, message: "Aucune sauvegarde." });
   return res.json({ ok: true, backup: backups[0] });
+});
+
+async function sendResetEmail(toEmail, resetUrl) {
+  if (!RESEND_API_KEY || !RESET_FROM_EMAIL) {
+    return { ok: false, message: "SMTP email non configure (RESEND_API_KEY/RESET_FROM_EMAIL)." };
+  }
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: RESET_FROM_EMAIL,
+      to: [toEmail],
+      subject: "Reinitialisation de votre mot de passe AGENT PREMIUM",
+      html: `<p>Bonjour,</p><p>Cliquez ici pour reinitialiser votre mot de passe:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Ce lien expire dans 30 minutes.</p>`
+    })
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    return { ok: false, message: err || "Echec envoi email." };
+  }
+  return { ok: true };
+}
+
+app.post("/api/auth/request-reset", async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  if (!email) {
+    return res.status(400).json({ ok: false, message: "Email requis." });
+  }
+  const token = crypto.randomBytes(24).toString("hex");
+  const expiresAt = Date.now() + (30 * 60 * 1000);
+  resetTokens.set(token, { email, expiresAt });
+  const base = FRONTEND_BASE_URL || `${req.protocol}://${req.get("host")}`;
+  const resetUrl = `${base.replace(/\/$/, "")}/login.html?reset_token=${token}&email=${encodeURIComponent(email)}`;
+  const send = await sendResetEmail(email, resetUrl);
+  if (!send.ok) {
+    return res.status(500).json({ ok: false, message: send.message });
+  }
+  return res.json({ ok: true, message: "Email de reinitialisation envoye." });
+});
+
+app.post("/api/auth/verify-reset-token", (req, res) => {
+  const token = String(req.body?.token || "");
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const entry = resetTokens.get(token);
+  if (!entry || entry.email !== email || Date.now() > entry.expiresAt) {
+    return res.status(400).json({ ok: false, message: "Lien invalide ou expire." });
+  }
+  return res.json({ ok: true });
+});
+
+app.post("/api/auth/consume-reset-token", (req, res) => {
+  const token = String(req.body?.token || "");
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const entry = resetTokens.get(token);
+  if (!entry || entry.email !== email || Date.now() > entry.expiresAt) {
+    return res.status(400).json({ ok: false, message: "Lien invalide ou expire." });
+  }
+  resetTokens.delete(token);
+  return res.json({ ok: true });
 });
 
 app.listen(PORT, () => {

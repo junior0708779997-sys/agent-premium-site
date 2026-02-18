@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connexion - AGENT PREMIUM</title>
   <meta name="description" content="Connectez-vous pour conserver votre historique de commandes et d'achats.">
-  <link rel="stylesheet" href="style.css?v=20260218-8">
+  <link rel="stylesheet" href="style.css?v=20260218-9">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -41,10 +41,10 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="backend-config.js?v=20260218-8"></script>
-  <script src="backend.js?v=20260218-8"></script>
-  <script src="auth-config.js?v=20260218-8"></script>
-  <script src="auth.js?v=20260218-8"></script>
+  <script src="backend-config.js?v=20260218-9"></script>
+  <script src="backend.js?v=20260218-9"></script>
+  <script src="auth-config.js?v=20260218-9"></script>
+  <script src="auth.js?v=20260218-9"></script>
   <script>
     const redirectTo = new URLSearchParams(window.location.search).get("redirect") || "index.html";
     const messageEl = document.getElementById("auth-message");
@@ -167,6 +167,9 @@
 
     if (window.AgentAuth.getCurrentUser()) {
       window.location.href = redirectTo;
+    }
+    if (new URLSearchParams(window.location.search).get("required") === "1") {
+      setMessage("Connexion obligatoire pour acceder au site.");
     }
     refreshHumanCheck();
 

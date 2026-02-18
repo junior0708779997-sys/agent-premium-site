@@ -109,14 +109,14 @@
   </script>
 
   <!-- CSS -->
-  <link rel="stylesheet" href="style.css?v=20260218-8">
+  <link rel="stylesheet" href="style.css?v=20260218-9">
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json?v=20260217-2">
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=20260218-8').catch((error) => {
+        navigator.serviceWorker.register('sw.js?v=20260218-9').catch((error) => {
           console.error('Erreur service worker:', error);
         });
       });
@@ -729,7 +729,10 @@
 <div class="cart-widget" id="cart-widget">
   <div class="cart-header">
     <span>Panier</span>
-    <span class="cart-count" id="cart-count">0</span>
+    <div class="cart-head-actions">
+      <span class="cart-count" id="cart-count">0</span>
+      <button type="button" class="cart-close-btn" id="cart-close-btn" aria-label="Fermer le panier">←</button>
+    </div>
   </div>
   <div class="cart-items" id="cart-items">
     <!-- Cart items will be added here -->
@@ -880,11 +883,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="backend-config.js?v=20260218-8"></script>
-<script src="backend.js?v=20260218-8"></script>
-<script src="notifications.js?v=20260218-8"></script>
-<script src="auth-config.js?v=20260218-8"></script>
-<script src="auth.js?v=20260218-8"></script>
-<script src="script.js?v=20260218-8"></script>
+<script src="backend-config.js?v=20260218-9"></script>
+<script src="backend.js?v=20260218-9"></script>
+<script src="notifications.js?v=20260218-9"></script>
+<script src="auth-config.js?v=20260218-9"></script>
+<script src="auth.js?v=20260218-9"></script>
+<script src="script.js?v=20260218-9"></script>
 </body>
 </html>

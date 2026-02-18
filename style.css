@@ -3901,3 +3901,73 @@ main > section:not(.hero) {
         grid-template-columns: 1fr;
     }
 }
+
+.cart-head-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cart-close-btn {
+    border: 1px solid #d4dfef;
+    background: #ffffff;
+    color: #1f3559;
+    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-weight: 700;
+    line-height: 1;
+}
+
+@media (max-width: 640px) {
+    .navbar {
+        padding: 0.85rem 0.7rem;
+    }
+
+    .logo {
+        font-size: 1.05rem;
+    }
+
+    .logo-text small {
+        font-size: 0.68rem;
+    }
+
+    .product-card h3 {
+        font-size: 0.98rem;
+    }
+
+    .product-card p,
+    .product-card .price {
+        font-size: 0.86rem;
+    }
+
+    .product-meta {
+        font-size: 0.72rem;
+        gap: 4px;
+    }
+
+    .cart-widget,
+    .chat-widget,
+    .account-panel,
+    .admin-panel {
+        bottom: 8px !important;
+        max-height: calc(100vh - 86px);
+        overflow: auto;
+    }
+
+    .quick-checkout-box {
+        border-radius: 14px;
+        padding: 12px;
+    }
+
+    .quick-form input,
+    .contact-form input,
+    .contact-form textarea,
+    .newsletter-form input {
+        font-size: 16px;
+    }
+}

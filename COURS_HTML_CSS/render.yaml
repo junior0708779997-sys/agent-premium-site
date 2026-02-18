@@ -1,0 +1,6 @@
+staticSites:
+  - name: agent-premium
+    rootDir: .
+    buildCommand: ""
+    publishPath: .
+    pullRequestPreviewsEnabled: false

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suivi commande - AGENT PREMIUM</title>
+  <meta name="description" content="Suivez l'etat de votre commande premium avec votre ID commande.">
+  <link rel="stylesheet" href="style.css?v=20260218-7">
+</head>
+<body>
+  <main class="conditions" style="max-width:760px;margin:30px auto;">
+    <h1>Suivi de commande</h1>
+    <p>Entrez votre ID commande (ex: cmd_1739981234567)</p>
+
+    <form id="track-form" class="auth-card" style="max-width:420px;">
+      <input type="text" id="track-id" placeholder="ID commande" required>
+      <button type="submit">Verifier</button>
+    </form>
+
+    <section id="track-result" style="margin-top:14px;"></section>
+    <p style="margin-top:14px;"><a href="index.html">Retour a l'accueil</a></p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="backend-config.js?v=20260218-7"></script>
+  <script src="backend.js?v=20260218-7"></script>
+  <script src="auth-config.js?v=20260218-7"></script>
+  <script src="auth.js?v=20260218-7"></script>
+  <script>
+    const form = document.getElementById("track-form");
+    const result = document.getElementById("track-result");
+
+    function statusLabel(status) {
+      if (status === "livree") return "Livree";
+      if (status === "payee") return "Payee";
+      return "En attente";
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const id = document.getElementById("track-id").value.trim();
+      if (!id) return;
+
+      const order = window.AgentBackend && window.AgentBackend.findOrderById
+        ? window.AgentBackend.findOrderById(id)
+        : null;
+      if (!order) {
+        result.innerHTML = "<p style='color:#9a2d2d'>Commande introuvable.</p>";
+        return;
+      }
+      const items = Array.isArray(order.items) ? order.items.map(i => `${i.name} x${i.quantity}`).join(", ") : "";
+      result.innerHTML = `
+        <div class="account-order-item">
+          <strong>ID:</strong> ${order.id}<br>
+          <strong>Client:</strong> ${order.userName || order.userEmail}<br>
+          <strong>Total:</strong> ${(order.totalAmount || 0).toLocaleString("fr-FR")} FCFA<br>
+          <strong>Paiement:</strong> ${order.paymentMethod || "Wave"}<br>
+          <strong>Produits:</strong> ${items || "Compte premium"}<br>
+          <span class="order-status ${order.status || "en_attente"}">${statusLabel(order.status)}</span>
+        </div>
+      `;
+    });
+  </script>
+</body>
+</html>

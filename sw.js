@@ -1,9 +1,17 @@
-const CACHE_NAME = 'agent-premium-v2';
+const CACHE_NAME = 'agent-premium-v5';
 const urlsToCache = [
   '/',
   '/index.html',
+  '/account.html',
+  '/login.html',
+  '/track.html',
   '/style.css',
   '/script.js',
+  '/auth.js',
+  '/auth-config.js',
+  '/backend.js',
+  '/backend-config.js',
+  '/notifications.js',
   '/manifest.json',
   '/images/1691829400logo-canva-png.png',
   '/images/premium-soft.mp4'

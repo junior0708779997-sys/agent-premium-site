@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mon compte - AGENT PREMIUM</title>
+  <meta name="description" content="Historique de commandes, suivi et factures AGENT PREMIUM.">
+  <link rel="stylesheet" href="style.css?v=20260218-7">
+</head>
+<body>
+  <main class="conditions" style="max-width:940px;margin:24px auto;">
+    <h1>Mon compte</h1>
+    <p id="account-page-user">Chargement...</p>
+
+    <section class="account-page-grid">
+      <article class="account-page-card">
+        <h2>Mes commandes</h2>
+        <div id="account-page-orders"></div>
+      </article>
+      <article class="account-page-card">
+        <h2>Actions rapides</h2>
+        <div class="account-page-actions">
+          <a class="account-login-link" href="track.html">Suivre une commande</a>
+          <a class="account-login-link" href="index.html#products">Racheter un produit</a>
+          <button class="account-logout-btn" id="account-page-logout">Se deconnecter</button>
+        </div>
+      </article>
+    </section>
+    <p style="margin-top:12px;"><a href="index.html">Retour a l'accueil</a></p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="backend-config.js?v=20260218-7"></script>
+  <script src="backend.js?v=20260218-7"></script>
+  <script src="auth-config.js?v=20260218-7"></script>
+  <script src="auth.js?v=20260218-7"></script>
+  <script>
+    function buildInvoiceNumber(order) {
+      const iso = String(order.createdAt || "").slice(0, 10).replace(/-/g, "");
+      const shortId = String(order.id || "").replace("cmd_", "").slice(-6);
+      return `INV-${iso}-${shortId || "000000"}`;
+    }
+
+    function formatStatus(status) {
+      if (status === "livree") return "Livree";
+      if (status === "payee") return "Payee";
+      return "En attente";
+    }
+
+    function renderAccountPage() {
+      const userLine = document.getElementById("account-page-user");
+      const ordersWrap = document.getElementById("account-page-orders");
+      const user = window.AgentAuth && window.AgentAuth.getCurrentUser ? window.AgentAuth.getCurrentUser() : null;
+      if (!user) {
+        userLine.textContent = "Vous n'etes pas connecte.";
+        ordersWrap.innerHTML = "<p>Connectez-vous pour voir vos commandes.</p><p><a href='login.html?redirect=account.html'>Se connecter</a></p>";
+        return;
+      }
+      userLine.textContent = `${user.name || user.email} • ${user.email || ""}`;
+
+      const orders = window.AgentAuth && window.AgentAuth.getOrderHistory ? window.AgentAuth.getOrderHistory() : [];
+      if (!Array.isArray(orders) || !orders.length) {
+        ordersWrap.innerHTML = "<p>Aucune commande enregistree.</p>";
+        return;
+      }
+      ordersWrap.innerHTML = orders.map((o) => {
+        const lines = Array.isArray(o.items) ? o.items.map((it) => `${it.name} x${it.quantity}`).join(", ") : "Produit premium";
+        return `
+          <div class="account-order-item">
+            <strong>${(parseInt(o.totalAmount, 10) || 0).toLocaleString("fr-FR")} FCFA</strong>
+            <div>${lines}</div>
+            <div>${o.paymentMethod || "Wave"} • ${new Date(o.createdAt).toLocaleString("fr-FR")}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+              <span class="order-status ${o.status || "en_attente"}">${formatStatus(o.status)}</span>
+              <button type="button" class="account-login-link" onclick="downloadInvoicePdf('${o.id}')">Facture PDF</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function getOrderById(orderId) {
+      const orders = window.AgentAuth && window.AgentAuth.getOrderHistory ? window.AgentAuth.getOrderHistory() : [];
+      return Array.isArray(orders) ? orders.find((o) => o.id === orderId) : null;
+    }
+
+    function downloadInvoicePdf(orderId) {
+      const order = getOrderById(orderId);
+      if (!order || !window.jspdf || !window.jspdf.jsPDF) return;
+      const user = window.AgentAuth && window.AgentAuth.getCurrentUser ? window.AgentAuth.getCurrentUser() : null;
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+      const invoiceNo = buildInvoiceNumber(order);
+      const total = (parseInt(order.totalAmount, 10) || 0).toLocaleString("fr-FR");
+      const status = formatStatus(order.status);
+      const date = new Date(order.createdAt).toLocaleString("fr-FR");
+      const items = Array.isArray(order.items) && order.items.length
+        ? order.items
+        : [{ name: "Produit premium", quantity: 1, unitPrice: parseInt(order.totalAmount, 10) || 0 }];
+
+      doc.setFillColor(31, 53, 89);
+      doc.rect(0, 0, 210, 30, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("AGENT PREMIUM", 14, 15);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text("Facture client", 14, 22);
+
+      doc.setTextColor(20, 30, 45);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text(`FACTURE ${invoiceNo}`, 14, 42);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(`Date: ${date}`, 14, 49);
+      doc.text(`ID commande: ${order.id}`, 14, 55);
+      doc.text(`Client: ${(user && (user.name || user.email)) || "Client"}`, 14, 61);
+      doc.text(`Email: ${(user && user.email) || "-"}`, 14, 67);
+
+      doc.setDrawColor(214, 225, 242);
+      doc.line(14, 72, 196, 72);
+
+      let y = 80;
+      doc.setFont("helvetica", "bold");
+      doc.text("Produits", 14, y);
+      y += 7;
+      doc.setFont("helvetica", "normal");
+      items.forEach((it) => {
+        const qty = parseInt(it.quantity, 10) || 1;
+        const unit = parseInt(it.unitPrice, 10) || 0;
+        const row = `- ${it.name} x${qty} = ${(qty * unit).toLocaleString("fr-FR")} FCFA`;
+        doc.text(row, 16, y);
+        y += 6;
+      });
+
+      y += 5;
+      doc.setDrawColor(214, 225, 242);
+      doc.line(14, y, 196, y);
+      y += 9;
+      doc.setFont("helvetica", "bold");
+      doc.text(`Total: ${total} FCFA`, 14, y);
+      y += 7;
+      doc.setFont("helvetica", "normal");
+      doc.text(`Paiement: ${order.paymentMethod || "Wave"}`, 14, y);
+      y += 6;
+      doc.text(`Statut: ${status}`, 14, y);
+
+      doc.setFontSize(9);
+      doc.setTextColor(90, 100, 120);
+      doc.text("Support: +225 07 08 77 99 97", 14, 286);
+      doc.text("Merci pour votre confiance.", 196, 286, { align: "right" });
+
+      doc.save(`facture-${invoiceNo}.pdf`);
+    }
+
+    document.getElementById("account-page-logout").addEventListener("click", () => {
+      if (window.AgentAuth && window.AgentAuth.logout) window.AgentAuth.logout();
+      window.location.href = "index.html";
+    });
+
+    renderAccountPage();
+    window.downloadInvoicePdf = downloadInvoicePdf;
+  </script>
+</body>
+</html>

@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="index, follow">
   <meta name="author" content="AGENT PREMIUM">
+  <meta name="keywords" content="comptes premium, netflix, spotify, canva pro, chatgpt plus, abonnement pas cher">
   <title>AGENT PREMIUM – Netflix, Spotify, Canva & Disney+ à prix réduit</title>
   <meta name="description" content="Achetez des comptes Netflix, Spotify, Canva et Disney+ à prix réduit. Comptes testés, livraison rapide et support WhatsApp 24h/24.">
+  <link rel="canonical" href="https://agent-premium.com/">
 
   <!-- Open Graph pour partage -->
   <meta property="og:title" content="AGENT PREMIUM – Comptes Premium à Prix Réduit">
@@ -107,14 +109,14 @@
   </script>
 
   <!-- CSS -->
-  <link rel="stylesheet" href="style.css?v=20260217-14">
+  <link rel="stylesheet" href="style.css?v=20260218-7">
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json?v=20260217-2">
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=20260217-2').catch((error) => {
+        navigator.serviceWorker.register('sw.js?v=20260218-7').catch((error) => {
           console.error('Erreur service worker:', error);
         });
       });
@@ -166,6 +168,7 @@
       <button id="theme-toggle" class="theme-btn" aria-label="Basculer le thème">🌙</button>
       <button id="lang-toggle" class="lang-btn" aria-label="Changer de langue">EN</button>
       <button id="dashboard-toggle" class="dashboard-toggle" aria-label="Dashboard client">👤</button>
+      <a href="account.html" class="account-login-link" style="padding:0.42rem 0.68rem;">Mon compte</a>
       <a href="#products" class="btn-primary head-buy">Commander</a>
     </div>
   </nav>
@@ -307,7 +310,7 @@
         </div>
         <span class="rating-text">4.6/5 (89 avis)</span>
       </div>
-      <span class="price">2000 FCFA / mois</span>
+      <span class="price">2 000 FCFA / mois</span>
       <span class="product-badge best">Noltex Seller</span>
       <button onclick="orderProduct('Capcut Pro - 2000 FCFA')" aria-label="Acheter Capcut Pro">
         Acheter
@@ -354,7 +357,7 @@
     <div class="product-card adobe fade-up">
       <h3>Adobe Pro 3 mois</h3>
       <p>Création Pro</p>
-      <span class="price">8 000 FCFA</span>
+      <span class="price">8 000 FCFA / 3 mois</span>
       <span class="product-badge best">Noltex Seller</span>
       <button onclick="orderProduct('Adobe - 8000 FCFA')">
         Acheter
@@ -386,7 +389,7 @@
     <div class="product-card Figma fade-up">
       <h3>Figma</h3>
       <p>Pour vos filtres et design </p>
-      <span class="price">1500 FCFA / mois</span>
+      <span class="price">1 500 FCFA / mois</span>
       <span class="product-badge best">Noltex Seller</span>
 
 
@@ -502,6 +505,24 @@
     </article>
   </div>
 </section>
+
+<section class="offer-highlight fade-up" id="categories">
+  <h2>Categories de comptes premium</h2>
+  <div class="offer-grid">
+    <article class="offer-card">
+      <h3>Streaming</h3>
+      <p>Netflix, Disney+, Prime Video, YouTube Premium</p>
+    </article>
+    <article class="offer-card">
+      <h3>Musique</h3>
+      <p>Spotify Premium, Deezer Premium</p>
+    </article>
+    <article class="offer-card">
+      <h3>Travail & IA</h3>
+      <p>Microsoft 365, Canva Pro, ChatGPT Plus, Figma Pro</p>
+    </article>
+  </div>
+</section>
 <!--=================Avis Client=======================-->
 <section class="reviews fade-up">
   <h2>Avis de nos clients</h2>
@@ -613,10 +634,11 @@
 
   <ol>
     <li>Choisissez votre compte premium</li>
-    <li>Cliquez sur Acheter ou Payer avec Wave</li>
-    <li>Vous êtes redirigé vers WhatsApp</li>
-    <li>Effectuez le paiement mobile</li>
-    <li>Envoyez la preuve et recevez votre compte</li>
+    <li>Ajoutez au panier puis cliquez sur Passer au paiement</li>
+    <li>Choisissez Wave, Orange Money ou MTN MoMo</li>
+    <li>Paiement direct (API) ou lien de paiement securise</li>
+    <li>Confirmation automatique de la commande</li>
+    <li>Livraison et suivi depuis votre espace client</li>
   </ol>
 
   <p>
@@ -727,6 +749,9 @@
   <div class="cart-total">
     Total: <span id="cart-total">0 FCFA</span>
   </div>
+  <button class="checkout-btn" type="button" onclick="continueShopping()" style="background:#edf5ff;color:#1f3559;border:1px solid #d7e1f0;">
+    Continuer mes achats
+  </button>
   <button class="checkout-btn" onclick="checkout()">Commander</button>
 </div>
 
@@ -811,6 +836,22 @@
     <textarea placeholder="Description" rows="3"></textarea>
     <button type="submit">Ajouter Produit</button>
   </form>
+  <div class="admin-orders" id="admin-orders">
+    <h4>Suivi commandes</h4>
+    <div class="admin-order-toolbar">
+      <input type="text" id="admin-order-search" placeholder="Rechercher client ou ID..." oninput="renderAdminOrders()">
+      <select id="admin-order-filter" onchange="renderAdminOrders()">
+        <option value="">Tous statuts</option>
+        <option value="en_attente">En attente</option>
+        <option value="payee">Payee</option>
+        <option value="livree">Livree</option>
+      </select>
+    </div>
+    <div class="admin-order-stats" id="admin-order-stats"></div>
+    <div id="admin-orders-list">
+      <p>Aucune commande.</p>
+    </div>
+  </div>
 </div>
 
 <!-- ================= BANNière COOKIES ================= -->
@@ -827,13 +868,20 @@
     <button class="quick-close" onclick="closeQuickCheckout()">×</button>
     <div class="quick-steps">
       <span id="step-indicator">Etape 1/3</span>
+      <div class="quick-progress">
+        <span id="quick-progress-fill"></span>
+      </div>
     </div>
     <div id="quick-checkout-content"></div>
   </div>
 </div>
 
-<script src="auth-config.js?v=20260217-13"></script>
-<script src="auth.js?v=20260217-13"></script>
-<script src="script.js?v=20260217-12"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="backend-config.js?v=20260218-7"></script>
+<script src="backend.js?v=20260218-7"></script>
+<script src="notifications.js?v=20260218-7"></script>
+<script src="auth-config.js?v=20260218-7"></script>
+<script src="auth.js?v=20260218-7"></script>
+<script src="script.js?v=20260218-7"></script>
 </body>
 </html>

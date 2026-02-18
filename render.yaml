@@ -4,3 +4,16 @@ services:
     runtime: static
     buildCommand: ""
     staticPublishPath: .
+  - type: web
+    name: agent-premium-api
+    runtime: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    envVars:
+      - key: WAVE_API_KEY
+        sync: false
+      - key: WAVE_WEBHOOK_SECRET
+        sync: false
+      - key: WAVE_BASE_URL
+        value: "https://api.wave.com"

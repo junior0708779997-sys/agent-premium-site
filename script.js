@@ -27,18 +27,31 @@ function isPromoActive() {
 
 /* ================= PRIX PROMO ================= */
 function applyPrices() {
+  const extractAmount = (text) => {
+    const match = String(text || "").match(/\d[\d\s]*/);
+    if (!match) return 0;
+    return parseInt(match[0].replace(/\s/g, ""), 10) || 0;
+  };
+
+  const extractSuffix = (text) => {
+    const raw = String(text || "").toLowerCase();
+    if (raw.includes("/ 3 mois")) return " / 3 mois";
+    if (raw.includes("/ mois")) return " / mois";
+    return "";
+  };
+
   document.querySelectorAll(".product-card").forEach(card => {
     const priceEl = card.querySelector(".price");
     if (!priceEl) return;
 
-    const originalPrice = parseInt(
-      priceEl.dataset.original || priceEl.textContent.replace(/\D/g, ""),
-      10
-    );
+    const rawText = priceEl.textContent || "";
+    const suffix = priceEl.dataset.suffix || extractSuffix(rawText);
+    const originalPrice = parseInt(priceEl.dataset.original || extractAmount(rawText), 10);
 
     if (!originalPrice) return;
 
     priceEl.dataset.original = originalPrice;
+    priceEl.dataset.suffix = suffix;
 
     if (isPromoActive()) {
       const promoPrice = Math.floor(
@@ -46,11 +59,11 @@ function applyPrices() {
       );
 
       priceEl.innerHTML = `
-        <span class="price-old">${originalPrice.toLocaleString()} FCFA</span><br>
-        <span class="price-new">${promoPrice.toLocaleString()} FCFA 🔥</span>
+        <span class="price-old">${originalPrice.toLocaleString("fr-FR")} FCFA${suffix}</span><br>
+        <span class="price-new">${promoPrice.toLocaleString("fr-FR")} FCFA${suffix} 🔥</span>
       `;
     } else {
-      priceEl.textContent = `${originalPrice.toLocaleString()} FCFA / mois`;
+      priceEl.textContent = `${originalPrice.toLocaleString("fr-FR")} FCFA${suffix}`;
     }
   });
 }
@@ -138,6 +151,7 @@ let quickCheckoutState = {
   customerPhone: ""
 };
 let preferredCheckoutPayment = "Wave";
+let currentCheckoutOrderId = "";
 
 function getActiveUser() {
   if (window.AgentAuth && typeof window.AgentAuth.getCurrentUser === 'function') {
@@ -149,12 +163,11 @@ function getActiveUser() {
 function recordOrderForActiveUser(paymentMethod, amount, items) {
   if (!window.AgentAuth || typeof window.AgentAuth.recordOrder !== 'function') return;
   const user = window.AgentAuth.getCurrentUser();
-  if (!user) return;
-  window.AgentAuth.recordOrder({
+  if (!user) return null;
+  return window.AgentAuth.recordOrder({
     totalAmount: amount,
     paymentMethod: paymentMethod,
-    items: items,
-    status: 'confirmee'
+    items: items
   });
 }
 
@@ -208,8 +221,13 @@ function openCartCheckout(preferredPayment = "") {
 function renderQuickCheckoutStep(step) {
   const content = document.getElementById("quick-checkout-content");
   const indicator = document.getElementById("step-indicator");
+  const progress = document.getElementById("quick-progress-fill");
   if (!content || !indicator) return;
+  const mobileCompact = window.innerWidth <= 640;
   indicator.textContent = `Etape ${step}/3`;
+  if (progress) {
+    progress.style.width = step === 1 ? "33%" : step === 2 ? "66%" : "100%";
+  }
 
   if (step === 1) {
     const itemsBlock = quickCheckoutState.mode === "cart" && quickCheckoutState.items.length > 0
@@ -218,10 +236,26 @@ function renderQuickCheckoutStep(step) {
         ).join("")}</div>`
       : `<p>Produit: <strong>${quickCheckoutState.productName}</strong></p>`;
 
-    content.innerHTML = `
+    content.innerHTML = mobileCompact
+      ? `
+      <h3>Paiement rapide mobile</h3>
+      ${itemsBlock}
+      <p>Montant: <strong>${quickCheckoutState.amount.toLocaleString('fr-FR')} FCFA</strong></p>
+      <div class="quick-payment-options">
+        <button onclick="setQuickPayment('Wave')">Wave</button>
+        <button onclick="setQuickPayment('Orange Money')">Orange Money</button>
+        <button onclick="setQuickPayment('MTN MoMo')">MTN MoMo</button>
+      </div>
+      <div class="quick-form">
+        <input id="quick-name" type="text" placeholder="Votre nom complet" value="${quickCheckoutState.customerName}" required>
+        <input id="quick-phone" type="text" placeholder="Numero WhatsApp (optionnel)" value="${quickCheckoutState.customerPhone}">
+      </div>
+      <button class="quick-next" onclick="quickMobileContinue()">Passer a la confirmation</button>
+    `
+      : `
       <h3>Choisir le paiement</h3>
       ${itemsBlock}
-      <p>Montant: <strong>${quickCheckoutState.amount.toLocaleString()} FCFA</strong></p>
+      <p>Montant: <strong>${quickCheckoutState.amount.toLocaleString('fr-FR')} FCFA</strong></p>
       <div class="quick-payment-options">
         <button onclick="setQuickPayment('Wave')">Wave</button>
         <button onclick="setQuickPayment('Orange Money')">Orange Money</button>
@@ -244,6 +278,10 @@ function renderQuickCheckoutStep(step) {
       ? quickCheckoutState.items.map(item => `<p><strong>${item.name}</strong> x${item.quantity}</p>`).join("")
       : `<p><strong>Produit:</strong> ${quickCheckoutState.productName}</p>`;
 
+    const payNowBtn = (window.NotificationService && typeof window.NotificationService.getPaymentLink === 'function' && window.NotificationService.getPaymentLink(quickCheckoutState.payment))
+      ? `<button class="quick-next" onclick="openConfiguredPaymentLink()" style="margin-top:6px;background:#0f5f9a;">Payer maintenant (${quickCheckoutState.payment})</button>`
+      : '';
+
     content.innerHTML = `
       <h3>Confirmation</h3>
       ${recapLines}
@@ -251,7 +289,51 @@ function renderQuickCheckoutStep(step) {
       <p><strong>Paiement:</strong> ${quickCheckoutState.payment}</p>
       <p><strong>Client:</strong> ${quickCheckoutState.customerName || "Non renseigne"}</p>
       <button class="quick-next" onclick="confirmQuickCheckout()">Confirmer sur WhatsApp</button>
+      ${payNowBtn}
+      <button class="quick-next" onclick="closeQuickCheckout()" style="margin-top:6px;background:#edf5ff;color:#1f3559;border:1px solid #d7e1f0;">Continuer mes achats</button>
     `;
+  }
+}
+
+function openConfiguredPaymentLink() {
+  const cfg = window.APP_CONFIG || {};
+  const apiBase = String(cfg.apiBaseUrl || "").trim();
+  if (apiBase) {
+    fetch(`${apiBase.replace(/\/$/, "")}/api/wave/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId: currentCheckoutOrderId || "",
+        amount: quickCheckoutState.amount,
+        paymentMethod: quickCheckoutState.payment,
+        currency: "XOF",
+        items: quickCheckoutState.items || [],
+        customerName: quickCheckoutState.customerName || "",
+        customerPhone: quickCheckoutState.customerPhone || "",
+        successUrl: `${window.location.origin}/index.html?payment=success`,
+        errorUrl: `${window.location.origin}/index.html?payment=error`
+      })
+    }).then(res => res.json())
+      .then(data => {
+        if (data && data.launchUrl) {
+          window.open(data.launchUrl, "_blank");
+          return;
+        }
+        const fallbackLink = window.NotificationService && typeof window.NotificationService.getPaymentLink === 'function'
+          ? window.NotificationService.getPaymentLink(quickCheckoutState.payment)
+          : "";
+        if (fallbackLink) window.open(fallbackLink, "_blank");
+      }).catch(() => {
+        const fallbackLink = window.NotificationService && typeof window.NotificationService.getPaymentLink === 'function'
+          ? window.NotificationService.getPaymentLink(quickCheckoutState.payment)
+          : "";
+        if (fallbackLink) window.open(fallbackLink, "_blank");
+      });
+    return;
+  }
+  if (window.NotificationService && typeof window.NotificationService.getPaymentLink === 'function') {
+    const link = window.NotificationService.getPaymentLink(quickCheckoutState.payment);
+    if (link) window.open(link, '_blank');
   }
 }
 
@@ -275,6 +357,10 @@ function saveQuickCustomer() {
   renderQuickCheckoutStep(3);
 }
 
+function quickMobileContinue() {
+  saveQuickCustomer();
+}
+
 function confirmQuickCheckout() {
   const phone = "2250708779997";
   const orderItems = quickCheckoutState.mode === "cart" && quickCheckoutState.items.length > 0
@@ -283,11 +369,17 @@ function confirmQuickCheckout() {
   const itemsText = orderItems.map(item =>
     `- ${item.name} x${item.quantity} = ${(item.unitPrice * item.quantity).toLocaleString()} FCFA`
   ).join("\n");
+  const recordResult = recordOrderForActiveUser(quickCheckoutState.payment, quickCheckoutState.amount, orderItems);
+  currentCheckoutOrderId = recordResult && recordResult.ok && recordResult.order ? recordResult.order.id : "";
+  const orderIdLine = recordResult && recordResult.ok && recordResult.order
+    ? `- ID commande: ${recordResult.order.id}`
+    : "- ID commande: (invite)";
   const message = `
 Bonjour AGENT PREMIUM,
 
 Je confirme ma commande:
 ${itemsText}
+${orderIdLine}
 - Montant: ${quickCheckoutState.amount.toLocaleString()} FCFA
 - Paiement choisi: ${quickCheckoutState.payment}
 - Nom client: ${quickCheckoutState.customerName || "Non renseigne"}
@@ -296,7 +388,29 @@ ${itemsText}
 Merci de m'envoyer la procedure finale.
 `;
   window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
-  recordOrderForActiveUser(quickCheckoutState.payment, quickCheckoutState.amount, orderItems);
+  if (window.NotificationService && typeof window.NotificationService.notifyOrder === 'function') {
+    window.NotificationService.notifyOrder("order_confirmed", {
+      orderId: (recordResult && recordResult.ok && recordResult.order) ? recordResult.order.id : "",
+      payment: quickCheckoutState.payment,
+      amount: quickCheckoutState.amount,
+      customerName: quickCheckoutState.customerName || "",
+      customerPhone: quickCheckoutState.customerPhone || "",
+      items: orderItems
+    }).catch(() => {});
+  }
+  if (recordResult && recordResult.ok && recordResult.order && window.AgentAuth && typeof window.AgentAuth.updateOrderStatus === 'function') {
+    const id = recordResult.order.id;
+    setTimeout(() => {
+      window.AgentAuth.updateOrderStatus(id, "payee");
+      renderAccountOrders();
+      renderAdminOrders();
+    }, 8000);
+    setTimeout(() => {
+      window.AgentAuth.updateOrderStatus(id, "livree");
+      renderAccountOrders();
+      renderAdminOrders();
+    }, 20000);
+  }
   if (quickCheckoutState.mode === "cart") {
     cart = [];
     localStorage.setItem('cart', JSON.stringify(cart));
@@ -304,6 +418,8 @@ Merci de m'envoyer la procedure finale.
     preferredCheckoutPayment = "Wave";
   }
   closeQuickCheckout();
+  renderAccountOrders();
+  renderAdminOrders();
 }
 
 function openCartPanel() {
@@ -1090,6 +1206,13 @@ function toggleCart() {
   document.getElementById('cart-widget').classList.toggle('show');
 }
 
+function continueShopping() {
+  const cartWidget = document.getElementById('cart-widget');
+  if (cartWidget) cartWidget.classList.remove('show');
+  const products = document.getElementById('products');
+  if (products) products.scrollIntoView({ behavior: 'smooth' });
+}
+
 function checkout() {
   if (cart.length === 0) {
     alert('Votre panier est vide.');
@@ -1185,7 +1308,9 @@ function normalizeProductCopy() {
 }
 
 /* ================= USER AUTHENTICATION ================= */
-let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+let currentUser = (window.AgentAuth && typeof window.AgentAuth.getCurrentUser === 'function')
+  ? window.AgentAuth.getCurrentUser()
+  : JSON.parse(localStorage.getItem('currentUser')) || null;
 
 function showAuthModal(isLogin = true) {
   const modal = document.getElementById('auth-modal') || createAuthModal();
@@ -1219,19 +1344,32 @@ function createAuthModal() {
   return modal;
 }
 
-function handleAuth(event) {
+async function handleAuth(event) {
   event.preventDefault();
   const email = event.target.querySelector('input[type="email"]').value;
   const password = event.target.querySelector('input[type="password"]').value;
+  const isLoginMode = event.target.querySelector('h3').textContent.includes('Connexion');
+  let result = { ok: false, message: 'Action impossible.' };
 
-  // Simulate authentication
-  if (email && password) {
-    currentUser = { email: email, name: email.split('@')[0] };
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-    document.getElementById('auth-modal').classList.remove('show');
-    updateUserDisplay();
-    sendPushNotification('Bienvenue !', `Bienvenue ${currentUser.name} !`);
+  if (window.AgentAuth) {
+    if (isLoginMode && typeof window.AgentAuth.loginEmail === 'function') {
+      result = await window.AgentAuth.loginEmail(email, password);
+    } else if (!isLoginMode && typeof window.AgentAuth.registerEmail === 'function') {
+      result = await window.AgentAuth.registerEmail(email.split('@')[0], email, password);
+    }
   }
+
+  if (result.ok) {
+    const modal = document.getElementById('auth-modal');
+    if (modal) modal.classList.remove('show');
+    updateUserDisplay();
+    const activeUser = getActiveUser();
+    if (activeUser) {
+      sendPushNotification('Bienvenue !', `Bienvenue ${activeUser.name || activeUser.email} !`);
+    }
+    return;
+  }
+  alert(result.message || 'Impossible de se connecter.');
 }
 
 function logout() {
@@ -1239,7 +1377,6 @@ function logout() {
     window.AgentAuth.logout();
   }
   currentUser = null;
-  localStorage.removeItem('currentUser');
   updateUserDisplay();
 }
 
@@ -1288,11 +1425,14 @@ function renderAccountOrders() {
     const created = new Date(order.createdAt).toLocaleString('fr-FR');
     const items = Array.isArray(order.items) ? order.items : [];
     const line = items.map(it => `${it.name} x${it.quantity}`).join(', ');
+    const status = order.status || 'en_attente';
+    const statusLabel = status === 'livree' ? 'Livree' : status === 'payee' ? 'Payee' : 'En attente';
     return `
       <div class="account-order-item">
         <strong>${(order.totalAmount || 0).toLocaleString('fr-FR')} FCFA</strong>
         <div>${line || 'Produit premium'}</div>
         <div>${order.paymentMethod || 'Wave'} • ${created}</div>
+        <span class="order-status ${status}">${statusLabel}</span>
       </div>
     `;
   }).join('');
@@ -1315,9 +1455,116 @@ function logoutUserFromSite() {
     window.AgentAuth.logout();
   }
   currentUser = null;
-  localStorage.removeItem('currentUser');
   closeAccountPanel();
   updateUserDisplay();
+}
+
+function renderAdminOrders() {
+  const list = document.getElementById('admin-orders-list');
+  const panel = document.getElementById('admin-panel');
+  if (!list || !panel) return;
+  const user = getActiveUser();
+  const isAdmin = !!(user && user.email && /admin/i.test(user.email));
+  panel.style.display = isAdmin ? '' : 'none';
+  if (!isAdmin) return;
+
+  if (!window.AgentAuth || typeof window.AgentAuth.getAllOrdersForAdmin !== 'function') {
+    list.innerHTML = '<p>Module admin indisponible.</p>';
+    return;
+  }
+  const orders = window.AgentAuth.getAllOrdersForAdmin();
+  const search = (document.getElementById('admin-order-search')?.value || '').toLowerCase();
+  const filter = document.getElementById('admin-order-filter')?.value || '';
+  const filtered = orders.filter((order) => {
+    const hay = `${order.id} ${order.userName} ${order.userEmail}`.toLowerCase();
+    const matchSearch = !search || hay.includes(search);
+    const matchFilter = !filter || order.status === filter;
+    return matchSearch && matchFilter;
+  });
+
+  const stats = document.getElementById('admin-order-stats');
+  if (stats) {
+    const pending = orders.filter(o => o.status === 'en_attente').length;
+    const paid = orders.filter(o => o.status === 'payee').length;
+    const delivered = orders.filter(o => o.status === 'livree').length;
+    const revenue = orders
+      .filter(o => o.status === 'payee' || o.status === 'livree')
+      .reduce((sum, o) => sum + (parseInt(o.totalAmount, 10) || 0), 0);
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayCount = orders.filter(o => String(o.createdAt || "").slice(0, 10) === todayISO).length;
+    stats.innerHTML = `
+      <span>En attente: ${pending}</span>
+      <span>Payees: ${paid}</span>
+      <span>Livrees: ${delivered}</span>
+      <span>CA encaisse: ${revenue.toLocaleString('fr-FR')} FCFA</span>
+      <span>Cmd aujourd'hui: ${todayCount}</span>
+      <button type="button" onclick="exportAdminOrdersCsv()">Exporter CSV</button>
+    `;
+  }
+  if (!filtered.length) {
+    list.innerHTML = '<p>Aucune commande.</p>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(order => `
+    <div class="admin-order-item">
+      <strong>${order.userName || order.userEmail}</strong><br>
+      <span>${(order.totalAmount || 0).toLocaleString('fr-FR')} FCFA • ${new Date(order.createdAt).toLocaleString('fr-FR')}</span><br>
+      <span>ID: ${order.id}</span>
+      <select onchange="updateAdminOrderStatus('${order.id}', this.value, '${order.ownerId || ''}')">
+        <option value="en_attente" ${order.status === 'en_attente' ? 'selected' : ''}>En attente</option>
+        <option value="payee" ${order.status === 'payee' ? 'selected' : ''}>Payee</option>
+        <option value="livree" ${order.status === 'livree' ? 'selected' : ''}>Livree</option>
+      </select>
+    </div>
+  `).join('');
+}
+
+function updateAdminOrderStatus(orderId, status, ownerId) {
+  if (!window.AgentAuth || typeof window.AgentAuth.updateOrderStatus !== 'function') return;
+  const result = window.AgentAuth.updateOrderStatus(orderId, status, ownerId);
+  if (!result.ok) {
+    renderAdminOrders();
+    return;
+  }
+  if (window.NotificationService && typeof window.NotificationService.notifyOrder === "function") {
+    window.NotificationService.notifyOrder("order_status_updated", {
+      orderId,
+      status,
+      ownerId: ownerId || "",
+      updatedAt: new Date().toISOString()
+    }).catch(() => {});
+  }
+  renderAccountOrders();
+  renderAdminOrders();
+}
+
+function exportAdminOrdersCsv() {
+  if (!window.AgentAuth || typeof window.AgentAuth.getAllOrdersForAdmin !== "function") return;
+  const rows = window.AgentAuth.getAllOrdersForAdmin();
+  if (!Array.isArray(rows) || !rows.length) return;
+  const header = ["id", "client", "email", "montant", "paiement", "statut", "date"];
+  const lines = [header.join(",")];
+  rows.forEach((row) => {
+    lines.push([
+      row.id || "",
+      `"${String(row.userName || "").replace(/"/g, '""')}"`,
+      `"${String(row.userEmail || "").replace(/"/g, '""')}"`,
+      parseInt(row.totalAmount, 10) || 0,
+      `"${String(row.paymentMethod || "").replace(/"/g, '""')}"`,
+      row.status || "",
+      row.createdAt || ""
+    ].join(","));
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `commandes-agent-premium-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /* ================= PAYMENT INTEGRATION ================= */
@@ -1480,11 +1727,31 @@ function rejectCookies() {
 
 /* ================= OFFER ENHANCEMENTS ================= */
 function normalizeProductPrices() {
+  const readAmount = (value) => {
+    const match = String(value || '').match(/\d[\d\s]*/);
+    if (!match) return 0;
+    return parseInt(match[0].replace(/\s/g, ''), 10) || 0;
+  };
+
   document.querySelectorAll('.product-card').forEach(card => {
     const priceEl = card.querySelector('.price');
     if (!priceEl) return;
+
+    const oldEl = priceEl.querySelector('.price-old');
+    const newEl = priceEl.querySelector('.price-new');
+
+    if (oldEl && newEl) {
+      const oldAmount = readAmount(oldEl.textContent);
+      const newAmount = readAmount(newEl.textContent);
+      const suffix = /mois/i.test(priceEl.textContent || '') ? ' / mois' : '';
+      if (oldAmount) oldEl.textContent = `${oldAmount.toLocaleString('fr-FR')} FCFA${suffix}`;
+      if (newAmount) newEl.textContent = `${newAmount.toLocaleString('fr-FR')} FCFA${suffix}`;
+      if (newAmount) card.dataset.price = String(newAmount);
+      return;
+    }
+
     const text = priceEl.textContent || '';
-    const amount = parseInt(text.replace(/\D/g, ''), 10);
+    const amount = readAmount(text);
     if (!amount) return;
     const suffix = /mois/i.test(text) ? ' / mois' : '';
     priceEl.textContent = `${amount.toLocaleString('fr-FR')} FCFA${suffix}`;
@@ -1557,15 +1824,115 @@ function animateCounters() {
   });
 }
 
+function hasVerifiedPurchase() {
+  if (!window.AgentAuth || typeof window.AgentAuth.getOrderHistory !== 'function') return false;
+  const orders = window.AgentAuth.getOrderHistory();
+  return Array.isArray(orders) && orders.length > 0;
+}
+
+function renderVerifiedReviews() {
+  const wrap = document.getElementById('verified-reviews-list');
+  if (!wrap) return;
+  let reviews = [];
+  try {
+    reviews = JSON.parse(localStorage.getItem('ap_verified_reviews_v1')) || [];
+  } catch {
+    reviews = [];
+  }
+  if (!reviews.length) {
+    wrap.innerHTML = '<p class="verified-review-empty">Aucun nouvel avis verifie pour le moment.</p>';
+    return;
+  }
+  wrap.innerHTML = reviews.slice(0, 6).map((r) => `
+    <article class="verified-review-item">
+      <div><strong>${r.name}</strong> <span class="verified-badge">Achat verifie</span></div>
+      <p>${r.comment}</p>
+      <small>${new Date(r.createdAt).toLocaleDateString('fr-FR')}</small>
+    </article>
+  `).join('');
+}
+
+function initVerifiedReviewComposer() {
+  const section = document.querySelector('.reviews');
+  if (!section || document.getElementById('verified-review-block')) return;
+  const block = document.createElement('div');
+  block.id = 'verified-review-block';
+  block.className = 'verified-review-block';
+  block.innerHTML = `
+    <h3>Avis verifies recents</h3>
+    <div id="verified-reviews-list"></div>
+    <form id="verified-review-form" class="verified-review-form">
+      <textarea id="verified-review-text" rows="3" maxlength="280" placeholder="Partagez votre experience apres votre achat..." required></textarea>
+      <button type="submit">Publier mon avis verifie</button>
+    </form>
+    <p id="verified-review-msg" class="verified-review-msg"></p>
+  `;
+  section.appendChild(block);
+
+  const form = document.getElementById('verified-review-form');
+  const msg = document.getElementById('verified-review-msg');
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const user = getActiveUser();
+      if (!user) {
+        msg.textContent = 'Connectez-vous pour laisser un avis verifie.';
+        msg.style.color = '#9a2d2d';
+        return;
+      }
+      if (!hasVerifiedPurchase()) {
+        msg.textContent = 'Avis reserve aux clients ayant deja commande.';
+        msg.style.color = '#9a2d2d';
+        return;
+      }
+      const text = document.getElementById('verified-review-text')?.value.trim();
+      if (!text || text.length < 8) {
+        msg.textContent = 'Votre avis doit contenir au moins 8 caracteres.';
+        msg.style.color = '#9a2d2d';
+        return;
+      }
+      let current = [];
+      try {
+        current = JSON.parse(localStorage.getItem('ap_verified_reviews_v1')) || [];
+      } catch {
+        current = [];
+      }
+      current.unshift({
+        id: `rv_${Date.now()}`,
+        userId: user.id || "",
+        name: user.name || user.email || "Client",
+        comment: text,
+        createdAt: new Date().toISOString()
+      });
+      localStorage.setItem('ap_verified_reviews_v1', JSON.stringify(current.slice(0, 30)));
+      form.reset();
+      msg.textContent = 'Avis publie avec succes.';
+      msg.style.color = '#0b7f66';
+      renderVerifiedReviews();
+    });
+  }
+  renderVerifiedReviews();
+}
+
+function applyPerformanceEnhancements() {
+  document.querySelectorAll('img').forEach((img) => {
+    if (!img.hasAttribute('loading')) img.setAttribute('loading', 'lazy');
+    if (!img.hasAttribute('decoding')) img.setAttribute('decoding', 'async');
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   normalizeProductCopy();
   normalizeProductPrices();
   injectProductDetails();
   animateCounters();
+  applyPerformanceEnhancements();
+  initVerifiedReviewComposer();
   initializeUrgencyMode();
   updateProductButtonLabels();
   updateUserDisplay();
   renderAccountOrders();
+  renderAdminOrders();
 
   const dashboardToggle = document.getElementById('dashboard-toggle');
   const accountPanel = document.getElementById('account-panel');
@@ -1627,7 +1994,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Simulation d'ajout de produit
         alert(`Produit "${name}" ajouté avec succès !`);
         adminForm.reset();
-        adminPanel.classList.remove('show');
+        if (adminPanel) adminPanel.classList.remove('show');
       }
     });
   }
